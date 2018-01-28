@@ -8,8 +8,12 @@ import { FormsModule } from '@angular/forms';
 
 import { MyApp } from './app.component';
 import { LoginPage } from '../pages/login/login';
-// import { LoginPageModule } from '../pages/login/login.module';
 import { HomePage } from '../pages/home/home';
+import { ENV_PROVIDER_IT, environment} from '../environment/environment'
+import { AUTH_PROVIDER_IT } from '../providers/auth/auth';
+import { CognitoAuthProvider } from '../providers/cognito-auth/cognito-auth';
+import { PROFILE_PROVIDER_IT } from '../providers/profile/profile';
+import { CognitoProfileProvider } from '../providers/cognito-profile/cognito-profile';
 
 @NgModule({
   declarations: [
@@ -20,7 +24,6 @@ import { HomePage } from '../pages/home/home';
   imports: [
     BrowserModule,
     FormsModule,
-    // LoginPageModule,
     IonicModule.forRoot(MyApp)
   ],
   bootstrap: [IonicApp],
@@ -32,7 +35,12 @@ import { HomePage } from '../pages/home/home';
   providers: [
     StatusBar,
     SplashScreen,
-    {provide: ErrorHandler, useClass: IonicErrorHandler}
+    {provide: ErrorHandler, useClass: IonicErrorHandler},
+    {provide: ENV_PROVIDER_IT, useValue: environment},
+    CognitoAuthProvider,
+    {provide: AUTH_PROVIDER_IT, useExisting: CognitoAuthProvider},
+    {provide: PROFILE_PROVIDER_IT, useClass: CognitoProfileProvider}
+
   ]
 })
 export class AppModule {}

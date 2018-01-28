@@ -1,3 +1,21 @@
 page-login {
 
 }
+
+ion-list.list.login-form {
+  margin-bottom: 1px;
+}
+ion-item.item.form-error .item-inner {
+  border: none;
+}
+ion-item.item.form-error p {
+  color: map-get($colors, danger);
+  font-size: 1.2rem;
+  text-align: right;
+}
+ion-item.item.form-error p ion-icon.icon {
+  font-size: 1.2rem;
+}
+ion-item.item.form-error ion-label.label {
+  margin-bottom: 0;
+}

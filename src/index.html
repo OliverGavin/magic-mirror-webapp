@@ -25,6 +25,11 @@
   </script>-->
 
   <link href="build/main.css" rel="stylesheet">
+  <script>
+  // TODO: https://ourcodeworld.com/articles/read/525/how-to-check-if-your-code-is-being-executed-in-electron-or-in-the-browser
+    const {webFrame} = require('electron')
+    webFrame.setZoomFactor(2)
+  </script>
 
 </head>
 <body>

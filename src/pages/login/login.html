@@ -6,27 +6,68 @@
 
 </ion-header>
 
-
 <ion-content padding>
-  <ion-list>
+  <form [formGroup]="form" (ngSubmit)="registering ? register(form.value) : login(form.value)">
 
-    <ion-item>
-      <ion-label floating>Username</ion-label>
-      <ion-input [(ngModel)]="email" type="text" value=""></ion-input>
-    </ion-item>
+    <ion-list class="registration-form" formGroupName="registrationForm" *ngIf="registering">
+      <ion-item>
+        <ion-label floating>name</ion-label>
+        <ion-input formControlName="name"  type="text" value="" placeholder="{{name.pressed ? 'first last':''}}"></ion-input>
+      </ion-item>
+      <ion-item class="form-error" *ngIf="name.errors && name.touched">
+        <p *ngFor="let i of getErrors(name.errors)"><ion-icon name="alert"></ion-icon> {{i}}</p>
+      </ion-item>
 
-    <ion-item>
-      <ion-label floating>Password</ion-label>
-      <ion-input [(ngModel)]="password"  type="password" value=""></ion-input>
-    </ion-item>
+      <span></span>
+    </ion-list>
 
-    <br/>
+    <ion-list class="login-form">
+      <ion-item>
+        <ion-label floating>email</ion-label>
+        <ion-input formControlName="email" type="text" value=""></ion-input>
+      </ion-item>
+      <ion-item class="form-error" *ngIf="email.errors && email.touched">
+        <p *ngFor="let i of getErrors(email.errors)"><ion-icon name="alert"></ion-icon> {{i}}</p>
+      </ion-item>
 
-  </ion-list>
+      <ion-item>
+        <ion-label floating>password</ion-label>
+        <ion-input formControlName="password"  type="password" value=""></ion-input>
+      </ion-item>
+      <ion-item class="form-error" *ngIf="password.errors && password.touched">
+        <p *ngFor="let i of getErrors(password.errors)"><ion-icon name="alert"></ion-icon> {{i}}</p>
+      </ion-item>
 
-  <div padding>
-    <button ion-button outline color="light" (click)="login()">Sign In</button>
-    <button ion-button outline color="light">Register</button>
-    <!-- <button primary block  (click)="login()">Sign In</button> -->
-  </div>
+      <span></span>
+    </ion-list>
+
+
+    <ion-list class="registration-form" formGroupName="registrationForm" *ngIf="registering">
+      <ion-item>
+        <ion-label floating>confirm password</ion-label>
+        <ion-input formControlName="confirmPassword"  type="password" value=""></ion-input>
+      </ion-item>
+      <ion-item class="form-error" *ngIf="confirmPassword.errors && confirmPassword.touched">
+        <p *ngFor="let i of getErrors(confirmPassword.errors)"><ion-icon name="alert"></ion-icon> {{i}}</p>
+      </ion-item>
+
+      <span></span>
+    </ion-list>
+
+    <div padding>
+      <button ion-button outline color="light" (click)="!registering ? login():toggleRegistration()"    type="{{!registering ? 'button':'submit'}}" [disabled]="!registering ? !form.valid:false">
+        {{!registering ? 'Sign In':''}}
+        <ion-icon *ngIf="registering" name="arrow-round-back"></ion-icon>
+      </button>
+      <button ion-button outline color="light" (click)="registering ? register():toggleRegistration()" type="{{registering ? 'button':'submit'}}" [disabled]="registering ? !form.valid:false">
+        Register
+      </button>
+    </div>
+
+    <ion-list>
+      <ion-item class="form-error" *ngIf="form.errors && form.touched">
+        <p *ngFor="let i of getErrors(form.errors)"><ion-icon name="alert"></ion-icon> {{i}}</p>
+      </ion-item>
+    </ion-list>
+  </form>
 </ion-content>
