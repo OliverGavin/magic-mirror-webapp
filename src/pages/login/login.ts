@@ -3,7 +3,7 @@ import { NavController, NavParams } from 'ionic-angular';
 import { FormBuilder, FormGroup, FormControl, Validators, ValidationErrors } from '@angular/forms';
 
 import { HomePage } from '../home/home'
-import { AUTH_PROVIDER_IT, AuthProvider, EmailAlreadyExistsError, UserNotFoundError, UserNotConfirmedError, PasswordIncorrectError } from '../../providers/auth/auth'
+import { AUTH_PROVIDER_IT, AuthProvider, AuthErrors } from '../../providers/auth/auth'
 import { PasswordValidators } from '../../util/forms/validators'
 
 
@@ -59,16 +59,16 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
     .then(() => {
       this.navCtrl.setRoot(HomePage);
     })
-    .catch((err: Error) => {
-      if (err instanceof UserNotFoundError)
+    .catch((err: AuthErrors) => {
+      if (err == AuthErrors.UserNotFoundError)
         this.email.setErrors({
           usernotfound: true
         })
-      else if (err instanceof UserNotConfirmedError)
+      else if (err == AuthErrors.UserNotConfirmedError)
         this.form.setErrors({
           usernotconfirmed: true
         })
-      else if (err instanceof PasswordIncorrectError)
+      else if (err == AuthErrors.PasswordIncorrectError)
         this.password.setErrors({
           passwordincorrect: true
         })
@@ -88,8 +88,8 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
     .then(() => {
       this.login()
     })
-    .catch((err: Error) => {
-      if (err instanceof EmailAlreadyExistsError)
+    .catch((err: AuthErrors) => {
+      if (err == AuthErrors.EmailAlreadyExistsError)
         this.email.setErrors({
           emailtaken: true
         })

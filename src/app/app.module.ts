@@ -8,18 +8,25 @@ import { FormsModule } from '@angular/forms';
 
 import { MyApp } from './app.component';
 import { LoginPage } from '../pages/login/login';
+import { LockscreenPage } from '../pages/lockscreen/lockscreen';
 import { HomePage } from '../pages/home/home';
+import { ClockComponent } from "../components/clock/clock";
+import { SpeechComponent } from "../components/speech/speech";
 import { ENV_PROVIDER_IT, environment} from '../environment/environment'
 import { AUTH_PROVIDER_IT } from '../providers/auth/auth';
 import { CognitoAuthProvider } from '../providers/cognito-auth/cognito-auth';
 import { PROFILE_PROVIDER_IT } from '../providers/profile/profile';
 import { CognitoProfileProvider } from '../providers/cognito-profile/cognito-profile';
+import { InputProvider } from '../providers/input/input';
 
 @NgModule({
   declarations: [
     MyApp,
     LoginPage,
-    HomePage
+    LockscreenPage,
+    HomePage,
+    ClockComponent,
+    SpeechComponent
   ],
   imports: [
     BrowserModule,
@@ -30,6 +37,7 @@ import { CognitoProfileProvider } from '../providers/cognito-profile/cognito-pro
   entryComponents: [
     MyApp,
     LoginPage,
+    LockscreenPage,
     HomePage
   ],
   providers: [
@@ -39,7 +47,8 @@ import { CognitoProfileProvider } from '../providers/cognito-profile/cognito-pro
     {provide: ENV_PROVIDER_IT, useValue: environment},
     CognitoAuthProvider,
     {provide: AUTH_PROVIDER_IT, useExisting: CognitoAuthProvider},
-    {provide: PROFILE_PROVIDER_IT, useClass: CognitoProfileProvider}
+    {provide: PROFILE_PROVIDER_IT, useClass: CognitoProfileProvider},
+    InputProvider
 
   ]
 })

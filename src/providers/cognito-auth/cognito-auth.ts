@@ -4,7 +4,7 @@ import AWS from 'aws-sdk'
 import { CognitoUserPool, ICognitoUserPoolData, ISignUpResult, AuthenticationDetails,
          CognitoUser, CognitoUserAttribute, CognitoUserSession } from 'amazon-cognito-identity-js'
 
-import { AuthProvider, IAuthRegistrationData, IAuthLoginData, EmailAlreadyExistsError, RegistrationError, UserNotFoundError, UserNotConfirmedError, PasswordIncorrectError, LoginError } from "../auth/auth";
+import { AuthProvider, IAuthRegistrationData, IAuthLoginData, AuthErrors } from "../auth/auth";
 import { ENV_PROVIDER_IT } from '../../environment/environment'
 
 
@@ -41,6 +41,7 @@ export class CognitoAuthProvider implements AuthProvider {
   }
 
   public getSession(): Promise<CognitoUserSession> {
+    this._user || (this._user = this.userPool.getCurrentUser())
     return new Promise<CognitoUserSession>((resolve, reject) => {
       if (!this._user) {
         reject(`UserNotLoggedIn`)  // TODO
@@ -62,6 +63,18 @@ export class CognitoAuthProvider implements AuthProvider {
     })
   }
 
+  public isAuthenticated(): Promise<void> {
+    return new Promise<void>((resolve, reject?) => {
+      this.getSession().then((_) => { resolve() }).catch((_) => { if(reject) reject() })
+    })
+  }
+
+  public isNotAuthenticated(): Promise<void> {
+    return new Promise<void>((resolve, reject?) => {
+      this.getSession().then((_) => { if(reject) reject() }).catch((_) => { resolve() })
+    })
+  }
+
 	public register(registrationData: IAuthRegistrationData): Promise<void> {
     let attributes = [
       new CognitoUserAttribute({
@@ -74,10 +87,10 @@ export class CognitoAuthProvider implements AuthProvider {
       this.userPool.signUp(registrationData.email, registrationData.password, attributes, null, (err: Error, result: ISignUpResult) => {
         if (err) {
           if (err.name === 'UsernameExistsException') {
-            reject(new EmailAlreadyExistsError())
+            reject(AuthErrors.EmailAlreadyExistsError)
             return
           }
-          reject(new RegistrationError())
+          reject(AuthErrors.RegistrationError)
           console.log(err)
           return
         }
@@ -124,19 +137,19 @@ export class CognitoAuthProvider implements AuthProvider {
         onFailure: (err) => {
           switch (err.code) {
             case 'UserNotFoundException': {
-              reject(new UserNotFoundError())
+              reject(AuthErrors.UserNotFoundError)
               break
             }
             case 'UserNotConfirmedException': {
-              reject(new UserNotConfirmedError())
+              reject(AuthErrors.UserNotConfirmedError)
               break
             }
             case 'NotAuthorizedException': {
-              reject(new PasswordIncorrectError())
+              reject(AuthErrors.PasswordIncorrectError)
               break
             }
             default: {
-              reject(new LoginError())
+              reject(AuthErrors.LoginError)
               console.log(err)
               break
             }
