@@ -21,11 +21,16 @@ export interface IAuthRegistrationData {
   name: string
 }
 
-export const enum AuthErrors {
-  LoginError,
-  UserNotFoundError,
-  UserNotConfirmedError,
-  PasswordIncorrectError,
-  RegistrationError,
-  EmailAlreadyExistsError
+export enum AuthErrors {
+  UserNotLoggedIn         = 'There is currently no user logged in',
+  NoSessionFound          = 'There is currently no for the user',
+  SessionExpiredOrInvalid = 'The user session has expired',
+
+  LoginError              = 'An error occurred while trying to log in',
+  UserNotFoundError       = 'The user does not exist',
+  UserNotConfirmedError   = 'The user has not confirmed their account',
+  PasswordIncorrectError  = 'The user has provided an incoreect password',
+
+  RegistrationError       = 'An error occurred while trying to register',
+  EmailAlreadyExistsError = 'The email address is already in use'
 }

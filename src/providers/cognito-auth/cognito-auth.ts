@@ -44,20 +44,39 @@ export class CognitoAuthProvider implements AuthProvider {
     this._user || (this._user = this.userPool.getCurrentUser())
     return new Promise<CognitoUserSession>((resolve, reject) => {
       if (!this._user) {
-        reject(`UserNotLoggedIn`)  // TODO
+        reject(AuthErrors.UserNotLoggedIn)
         return
       }
 
       this._user.getSession((err, session: CognitoUserSession) => {
         if(err) {
-          reject(`NoSession: ${err}`)  // TODO
+          reject(AuthErrors.NoSessionFound)
           return
         }
         if(!session.isValid()) {
-          reject(`SessionExpiredOrInvalid`)  // TODO
+          reject(AuthErrors.SessionExpiredOrInvalid)
           return
         }
-        resolve(session)
+
+        // TODO more efficient? not every time? swapping users, etc
+        AWS.config.region = this.auth.REGION
+
+        let logins = {}
+        let endpoint = `cognito-idp.${this.auth.REGION}.amazonaws.com/${this.auth.USER_POOL_ID}`
+        logins[endpoint] = session.getIdToken().getJwtToken()
+
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId : this.auth.IDENTITY_POOL_ID,
+            Logins : logins,
+            // LoginId: 'w@w.com'  // TODO investigate purpose? - possibly required for multiple sessions/users, not email?
+        });
+
+        (<AWS.CognitoIdentityCredentials>AWS.config.credentials).getPromise().then(() => {
+          resolve(session)
+        }).catch((err) => {
+          reject('Failed to obtain AWS credentials')
+        })
+
       })
 
     })
@@ -117,21 +136,8 @@ export class CognitoAuthProvider implements AuthProvider {
         onSuccess: (session: CognitoUserSession, userTrackingConfirmationNecessary: boolean) => {
           console.log('access token + ' + session.getAccessToken().getJwtToken());
 
-          AWS.config.region = this.auth.REGION
-
-          let logins = {}
-          let endpoint = `cognito-idp.${this.auth.REGION}.amazonaws.com/${this.auth.USER_POOL_ID}`
-          logins[endpoint] = session.getIdToken().getJwtToken()
-
-          AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-              IdentityPoolId : this.auth.IDENTITY_POOL_ID,
-              Logins : logins,
-              LoginId: loginData.email
-          });
-          (<AWS.CognitoIdentityCredentials>AWS.config.credentials).getPromise().then(() => {
-            console.log(AWS.config.credentials);
-            resolve()
-          })
+          return this.getSession()
+                     .then(() => { resolve() })  // catch?
 
         },
         onFailure: (err) => {
