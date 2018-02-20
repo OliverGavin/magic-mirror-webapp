@@ -1,0 +1,19 @@
+<ion-header>
+  <ion-navbar color="dark">
+    <ion-title>
+      User Setup
+    </ion-title>
+  </ion-navbar>
+</ion-header>
+
+
+<ion-content padding>
+  <img *ngIf="face" [src]="face" alt="..." />
+
+  <div>
+    <div style="display: inline" *ngFor="let face of faces">
+        <!-- <img [src]="face" alt="..." /> -->
+        <img [src]="('data:image/jpeg;charset=utf-8;base64,' + face) | safe: 'resourceUrl'" alt="..." />
+    </div>
+  </div>
+</ion-content>

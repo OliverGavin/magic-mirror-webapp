@@ -17,7 +17,7 @@ export class InputProvider {
   public getFaces(): Observable<string> {
     let observable = new Observable<string>(observer => {
       this.socket.on('subscribe', (data) => {
-        let img = 'data:image/jpeg;charset=utf-8;base64,' + data['count'];
+        let img = data['count'];
         observer.next(img)
       })
 

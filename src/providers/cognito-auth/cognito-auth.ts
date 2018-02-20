@@ -83,14 +83,22 @@ export class CognitoAuthProvider implements AuthProvider {
   }
 
   public isAuthenticated(): Promise<void> {
-    return new Promise<void>((resolve, reject?) => {
-      this.getSession().then((_) => { resolve() }).catch((_) => { if(reject) reject() })
+    return new Promise<void>((resolve, reject) => {
+      this.getSession().then((_) => { resolve() }).catch((_) => { reject() })
     })
   }
 
   public isNotAuthenticated(): Promise<void> {
-    return new Promise<void>((resolve, reject?) => {
-      this.getSession().then((_) => { if(reject) reject() }).catch((_) => { resolve() })
+    return new Promise<void>((resolve, reject) => {
+      this.getSession().then((_) => { reject() }).catch((_) => { resolve() })
+    })
+  }
+
+  public getJwtIdToken(): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      this.getSession().then((session: CognitoUserSession) => {
+        resolve(session.getIdToken().getJwtToken())
+      })
     })
   }
 

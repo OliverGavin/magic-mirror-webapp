@@ -60,4 +60,8 @@ export class CognitoProfileProvider implements ProfileProvider {
     return this.getAttribute('name')
   }
 
+	public getId(): Promise<string> {
+    return this.getAttribute('sub')
+	}
+
 }

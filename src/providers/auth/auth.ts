@@ -5,6 +5,7 @@ export const AUTH_PROVIDER_IT = new InjectionToken<AuthProvider>('auth')
 export interface AuthProvider {
   isAuthenticated(): Promise<void>
   isNotAuthenticated(): Promise<void>
+  getJwtIdToken(): Promise<string>
   register(IAuthRegistrationData): Promise<void>
   login(IAuthLoginData): Promise<void>
   logout()

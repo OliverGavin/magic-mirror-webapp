@@ -1,15 +1,17 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { IonicPage, NavController, NavParams } from 'ionic-angular';
+import { NavController, NavParams } from 'ionic-angular';
 
 import { AUTH_PROVIDER_IT, AuthProvider } from "../../providers/auth/auth";
+import { DeviceAccountProvider } from "../../providers/device-account/device-account";
+
 import { LoginPage } from '../login/login';
+import { DeviceGroupSetupPage } from "../device-group-setup/device-group-setup";
+import { UserProfileSetupPage } from "../user-profile-setup/user-profile-setup";
 
 import { ClockComponent } from "../../components/clock/clock";
 import { SpeechComponent } from "../../components/speech/speech";
-import * as AWS from "aws-sdk";
 
 
-@IonicPage()
 @Component({
   selector: 'page-lockscreen',
   templateUrl: 'lockscreen.html',
@@ -17,13 +19,35 @@ import * as AWS from "aws-sdk";
 export class LockscreenPage implements OnInit {
 
   constructor(public navCtrl: NavController, public navParams: NavParams,
-              @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider) {
+              @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider,
+              public deviceAccount: DeviceAccountProvider) {
 
-    this.auth.isNotAuthenticated().then(() => {
-      this.navCtrl.setRoot(LoginPage)
-    })
-    .catch(() => {})
+  }
 
+  ionViewWillEnter() {
+    Promise.resolve()
+      .then(() =>
+        this.auth.isAuthenticated()
+            .catch((e) => {
+              this.navCtrl.push(LoginPage)
+              throw e
+            })
+      )
+      .then(() =>
+        this.deviceAccount.isConfigured()
+            .catch((e) => {
+              this.navCtrl.push(DeviceGroupSetupPage)
+              throw e
+            })
+      )
+      .then(() =>
+        this.deviceAccount.isUserConfigured()
+            .catch((e) => {
+              this.navCtrl.push(UserProfileSetupPage)
+              throw e
+            })
+      )
+      .catch(() => {})
   }
 
   ngOnInit(): void {

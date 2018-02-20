@@ -1,0 +1,21 @@
+<ion-header>
+  <ion-navbar color="dark">
+    <ion-title>
+      Device Setup
+    </ion-title>
+  </ion-navbar>
+</ion-header>
+
+
+<ion-content padding>
+  <ion-list>
+    <ion-item *ngFor="let group of groups" (click)="selectGroup(group)">
+        {{ group.name }}
+    </ion-item>
+    <ion-item (click)="showCreateGroupDialog()">
+        <ion-icon name="add-circle" item-left></ion-icon>
+          Create Group
+        <ion-icon item-right ></ion-icon>
+    </ion-item>
+  </ion-list>
+</ion-content>
