@@ -1,10 +1,11 @@
 import { Component, OnInit, Inject } from '@angular/core';
-import { NavController, NavParams } from 'ionic-angular';
+import { NavController, NavParams, ModalController } from 'ionic-angular';
 import { FormBuilder, FormGroup, FormControl, Validators, ValidationErrors } from '@angular/forms';
 
 import { HomePage } from '../home/home'
 import { AUTH_PROVIDER_IT, AuthProvider, AuthErrors } from '../../providers/auth/auth'
 import { PasswordValidators } from '../../util/forms/validators'
+import { SocialDeviceLoginPage } from "../social-device-login/social-device-login";
 
 
 @Component({
@@ -17,6 +18,7 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
   private registering: boolean = true
 
   constructor(public navCtrl: NavController, public navParams: NavParams,
+              private modalCtrl : ModalController,
               public formBuilder: FormBuilder,
               @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider) {
   }
@@ -98,6 +100,22 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
           ooops: true
         })
     })
+  }
+
+  private google() {
+    let modal = this.modalCtrl.create(SocialDeviceLoginPage, {socialLoginProvider: 'Google'})
+    modal.onDidDismiss(data => {
+      console.log(data)
+    })
+    modal.present()
+  }
+
+  private facebook() {
+    let modal = this.modalCtrl.create(SocialDeviceLoginPage, {socialLoginProvider: 'Facebook'})
+    modal.onDidDismiss(data => {
+      console.log(data)
+    })
+    modal.present()
   }
 
    private errors = {

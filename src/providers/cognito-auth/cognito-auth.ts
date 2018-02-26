@@ -19,10 +19,12 @@ export class ICognitoAuthData {
 @Injectable()
 export class CognitoAuthProvider implements AuthProvider {
 
+  // TODO factor out user pool login from this so that an interface can be used with other login providers
+
   private _user: CognitoUser
 
   constructor(@Inject(ENV_PROVIDER_IT) private auth: ICognitoAuthData) {
-    console.log('new CognitoAuthProvider')
+
   }
 
   private get userPool(): CognitoUserPool {
@@ -82,17 +84,28 @@ export class CognitoAuthProvider implements AuthProvider {
     })
   }
 
-  public isAuthenticated(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.getSession().then((_) => { resolve() }).catch((_) => { reject() })
+  public isAuthenticated(): Promise<boolean> {
+    return new Promise<boolean>((resolve, reject) => {
+      this.getSession()
+        .then((_) => resolve(true))
+        .catch(err => {
+          [AuthErrors.UserNotLoggedIn, AuthErrors.NoSessionFound, AuthErrors.SessionExpiredOrInvalid].includes(err) ?
+            resolve(false) : reject(err)
+        })
     })
   }
 
-  public isNotAuthenticated(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.getSession().then((_) => { reject() }).catch((_) => { resolve() })
-    })
-  }
+  // public isAuthenticated(): Promise<void> {
+  //   return new Promise<void>((resolve, reject) => {
+  //     this.getSession().then((_) => { resolve() }).catch((_) => { reject() })
+  //   })
+  // }
+  //
+  // public isNotAuthenticated(): Promise<void> {
+  //   return new Promise<void>((resolve, reject) => {
+  //     this.getSession().then((_) => { reject() }).catch((_) => { resolve() })
+  //   })
+  // }
 
   public getJwtIdToken(): Promise<string> {
     return new Promise<string>((resolve, reject) => {

@@ -24,12 +24,13 @@ export class DeviceGroupSetupPage implements OnInit {
       .then((groups: Array<IDeviceGroupData>) => {
         this.groups = groups
       })
+      .catch(err => console.log('Could not load device groups.'))
   }
 
   private showCreateGroupDialog() {
     let prompt = this.alertCtrl.create({
       title: 'Device Group Name',
-      message: "Enter a name for the new device group",
+      message: 'Enter a name for the new device group',
       inputs: [{
         name: 'groupName',
         value: 'Home'

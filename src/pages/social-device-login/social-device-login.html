@@ -1,0 +1,37 @@
+<ion-header>
+
+  <ion-navbar color="dark">
+    <ion-title>Sign in with {{ provider }}</ion-title>
+  </ion-navbar>
+
+</ion-header>
+
+
+<ion-content padding>
+
+  <div id="device-login-qr">
+    <ngx-qrcode qrc-value="{{ qr }}" qrc-class="aclass" qrc-errorCorrectionLevel="L">
+    </ngx-qrcode>
+  </div>
+
+  <div id="device-login-url">
+    <p>
+      {{ url }}
+      <span *ngIf="!url" class="loading-blur">verification url</span>
+    </p>
+  </div>
+  <div id="device-login-code">
+    <p>
+      {{ code }}
+      <span *ngIf="!code" class="loading-blur">XXXXXXXX</span>
+    </p>
+  </div>
+
+  <div id="device-login-cancel">
+    <button ion-button outline color="light" (click)="cancel()" type="button">
+      Cancel
+    </button>
+  </div>
+
+  <speech [text]="'Please sign in using your smartphone'"></speech>
+</ion-content>

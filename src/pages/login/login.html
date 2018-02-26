@@ -62,6 +62,12 @@
       <button ion-button outline color="light" (click)="registering ? register():toggleRegistration()" type="{{registering ? 'button':'submit'}}" [disabled]="registering ? !form.valid:false">
         Register
       </button>
+      <button ion-button outline color="light" *ngIf="!registering" (click)="google()" type="button">
+        <ion-icon name="logo-google"></ion-icon>
+      </button>
+      <button ion-button outline color="light" *ngIf="!registering" (click)="facebook()" type="button">
+        <ion-icon name="logo-facebook"></ion-icon>
+      </button>
     </div>
 
     <ion-list>

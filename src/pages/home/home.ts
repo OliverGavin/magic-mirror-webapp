@@ -7,6 +7,8 @@ import { NavController, NavParams } from 'ionic-angular';
 })
 export class HomePage {
 
+  message: string = 'Hello Oliver'
+
   constructor(public navCtrl: NavController, public navParams: NavParams) {
 
   }

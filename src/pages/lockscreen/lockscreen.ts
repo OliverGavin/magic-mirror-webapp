@@ -1,53 +1,117 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { NavController, NavParams } from 'ionic-angular';
 
+import { Observable } from "rxjs/Observable";
+import { Subscription } from "rxjs/Subscription";
+import { Subject } from "rxjs/Subject";
+
 import { AUTH_PROVIDER_IT, AuthProvider } from "../../providers/auth/auth";
 import { DeviceAccountProvider } from "../../providers/device-account/device-account";
+import { InputProvider } from "../../providers/input/input";
+import { PollyPipe } from "../../pipes/polly/polly";
 
 import { LoginPage } from '../login/login';
 import { DeviceGroupSetupPage } from "../device-group-setup/device-group-setup";
 import { UserProfileSetupPage } from "../user-profile-setup/user-profile-setup";
+import { HomePage } from "../home/home";
 
 import { ClockComponent } from "../../components/clock/clock";
 import { SpeechComponent } from "../../components/speech/speech";
 
+import 'rxjs/add/observable/fromPromise';
+import 'rxjs/add/observable/empty';
+import 'rxjs/add/operator/windowCount';
+import 'rxjs/add/operator/takeLast';
+import 'rxjs/add/operator/catch';
+
 
 @Component({
   selector: 'page-lockscreen',
-  templateUrl: 'lockscreen.html',
+  templateUrl: 'lockscreen.html'
 })
 export class LockscreenPage implements OnInit {
+  private message: string
+  private subscription: Subscription
 
   constructor(public navCtrl: NavController, public navParams: NavParams,
               @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider,
-              public deviceAccount: DeviceAccountProvider) {
+              public deviceAccount: DeviceAccountProvider,
+              public input: InputProvider) {
 
   }
 
-  ionViewWillEnter() {
+  ionViewDidEnter() {
     Promise.resolve()
       .then(() =>
         this.auth.isAuthenticated()
-            .catch((e) => {
-              this.navCtrl.push(LoginPage)
-              throw e
+            .then(is => {
+              if (!is) {
+                this.navCtrl.push(LoginPage)
+                throw 'Skip'
+              }
             })
       )
       .then(() =>
         this.deviceAccount.isConfigured()
-            .catch((e) => {
-              this.navCtrl.push(DeviceGroupSetupPage)
-              throw e
+            .then(is => {
+              if (!is) {
+                this.navCtrl.push(DeviceGroupSetupPage)
+                throw 'Skip'
+              }
             })
       )
       .then(() =>
         this.deviceAccount.isUserConfigured()
-            .catch((e) => {
-              this.navCtrl.push(UserProfileSetupPage)
-              throw e
+            .then(is => {
+              if (!is) {
+                this.navCtrl.push(UserProfileSetupPage)
+                throw 'Skip'
+              }
             })
       )
-      .catch(() => {})
+      .then(() =>
+        this.waitForFaceAuth(
+          () => this.navCtrl.setRoot(HomePage),
+          () => this.message = "Hello, I don't think we've met?"
+        )
+      )
+      .catch(err => {if(err != 'Skip') console.log(err)})
+  }
+
+  waitForFaceAuth(onSuccess: () => void, onFailure?: () => void) {
+    let subject = new Subject()
+    let failureSubscription = subject
+      .windowCount(3)
+      .switchMap(window => window.takeLast(1))
+      .subscribe(() => onFailure())
+
+    let faceSubscription = this.input.getFaces()
+      .throttleTime(1000)
+      .switchMap(face =>
+
+        new Observable<HTMLImageElement>(observer => {
+          var i = new Image()
+          i.onload = () => observer.next(i)
+          i.src = 'data:image/jpeg;charset=utf-8;base64,' + face
+        })
+        .map(i => ({ face, i }))
+
+      ).filter(({ i }) =>  {
+        return i.width >= 80 && i.height >= 80
+      })
+      .switchMap(({ face }) => {
+        return Observable.fromPromise(this.deviceAccount.authenticateUserFace(face))
+          .catch(err => {
+            subject.next()
+            return Observable.empty()
+          })
+      })
+      .subscribe((token) => {
+        console.log(token)
+        faceSubscription.unsubscribe()
+        failureSubscription.unsubscribe()
+        onSuccess()
+      })
   }
 
   ngOnInit(): void {

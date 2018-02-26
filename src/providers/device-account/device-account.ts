@@ -5,6 +5,7 @@ import { Storage } from '@ionic/storage';
 import { Observable } from "rxjs/Observable";
 import "rxjs/add/operator/map"
 
+import { AUTH_PROVIDER_IT, AuthProvider } from "../auth/auth";
 import { PROFILE_PROVIDER_IT, ProfileProvider } from "../profile/profile";
 import { ENV_PROVIDER_IT } from "../../environment/environment";
 
@@ -31,6 +32,7 @@ export interface IDeviceGroupUserData {
 export class DeviceAccountProvider {
 
   constructor(public http: HttpClient, private storage: Storage,
+              @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider,
               @Inject(PROFILE_PROVIDER_IT) public profile: ProfileProvider,
               @Inject(ENV_PROVIDER_IT) private apiConfig: IApiConfigData) {
 
@@ -50,24 +52,31 @@ export class DeviceAccountProvider {
     return this.storage.set('DeviceAccount:DeviceGroupId', value)
   }
 
-  public isConfigured(): Promise<void> {
+  public isConfigured(): Promise<boolean> {
     // check local storage for device groupid and main user
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<boolean>((resolve, reject) => {
       this.getDeviceGroupId()
         .then(groupId => {
+          console.log(groupId)
           return this.http
             .get(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}`)
-            .map(response => (<Array<IDeviceGroupData>> response))
             .toPromise()
         })
-        .then(() => resolve())
-        .catch(() => reject())
+        .then(() => resolve(true))
+        .catch(err => err == null || (status in err && err.status == 404) ? resolve(false) : reject(err))
     })
   }
 
-  public isUserConfigured(): Promise<void> {
-    return new Promise<void>((resolve, reject?) => {
-      reject()
+  public isUserConfigured(): Promise<boolean> {
+    return new Promise<boolean>((resolve, reject) => {
+      Promise.all([this.profile.getId(), this.getDeviceGroupId()])
+        .then(([userId, groupId]) => {
+          return this.http
+            .get(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/users/${userId}`)
+            .toPromise()
+        })
+        .then(data => resolve(data['faceNum'] > 6))
+        .catch(err => reject(err))
     })
   }
 
@@ -120,16 +129,33 @@ export class DeviceAccountProvider {
 
   public registerUserFace(faces: Array<string>): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      Promise.all([this.profile.getId(), this.getDeviceGroupId()])
-        .then(([userId, groupId]) => {
-          return this.http
+      Promise.all([this.profile.getId(), this.getDeviceGroupId(), this.auth.getJwtIdToken()])
+        .then(([userId, groupId, token]) =>
+          this.http
             .post(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/users/${userId}/faces`, {
-              faces: faces
+              faces: faces,
+              token: token
             })
             .toPromise()
-        })
+        )
         .then(() => resolve())
         .catch((err) => reject(err))
+    })
+  }
+
+  public authenticateUserFace(face: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      this.getDeviceGroupId()
+        .then(groupId =>
+          this.http
+            .post(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/auth`, {
+              face: face
+            })
+            .map(response => (<string> response['token']))
+            .toPromise()
+        )
+        .then(token => resolve(token))
+        .catch(err => reject(err))
     })
   }
 
