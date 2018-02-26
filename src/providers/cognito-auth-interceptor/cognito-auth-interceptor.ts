@@ -15,6 +15,10 @@ export class CognitoAuthInterceptor implements HttpInterceptor {
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     // TODO if AWS
+    let isAWS = request.url.split('/')[2].endsWith('amazonaws.com')
+    if (!isAWS)
+      return next.handle(request)
+
     return Observable.from(this.auth.getJwtIdToken()).switchMap(token => {
       console.log('IdToken: ' + token)
       request = request.clone({
@@ -22,8 +26,8 @@ export class CognitoAuthInterceptor implements HttpInterceptor {
           'Authorization': token,
           'Content-Type': 'application/json'
         }
-      });
-      return next.handle(request);
+      })
+      return next.handle(request)
     })
   }
 
