@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Input } from '@angular/core';
 
 
 @Component({
@@ -7,10 +7,11 @@ import { Component } from '@angular/core';
 })
 export class SpeechComponent {
 
+  @Input()
   text: string;
 
   constructor() {
-    this.text = "Hello, I don't think we've met?";
+    
   }
 
 }
