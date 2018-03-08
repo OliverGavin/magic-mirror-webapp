@@ -6,6 +6,11 @@ import { HomePage } from '../home/home'
 import { AUTH_PROVIDER_IT, AuthProvider, AuthErrors } from '../../providers/auth/auth'
 import { PasswordValidators } from '../../util/forms/validators'
 import { SocialDeviceLoginPage } from "../social-device-login/social-device-login";
+import { FederatedIdentityProvider } from "../../providers/federated-identity/federated-identity";
+import { CognitoSession } from "../../providers/federated-identity/cognito-session";
+import { FacebookSession } from "../../providers/federated-identity/facebook-session";
+import * as AWS from "aws-sdk";
+import { LockscreenPage } from "../lockscreen/lockscreen";
 
 
 @Component({
@@ -17,10 +22,13 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
   private form: FormGroup
   private registering: boolean = true
 
-  constructor(public navCtrl: NavController, public navParams: NavParams,
+  constructor(private navCtrl: NavController, private navParams: NavParams,
               private modalCtrl : ModalController,
-              public formBuilder: FormBuilder,
-              @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider) {
+              private formBuilder: FormBuilder,
+              @Inject(AUTH_PROVIDER_IT) private auth: AuthProvider,
+              private federatedIdentity: FederatedIdentityProvider,
+              private cognitoSession: CognitoSession,
+              private facebookSession: FacebookSession) {
   }
 
   ngOnInit(): void {
@@ -59,7 +67,14 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
       password: this.password.value
     })
     .then(() => {
-      this.navCtrl.setRoot(HomePage);
+      this.federatedIdentity.setFederatedIdentitySession(this.cognitoSession)
+      this.federatedIdentity.getSession()
+      // let test = (<AWS.CognitoIdentityCredentials>AWS.config.credentials)
+      // debugger
+      // console.log(window.localStorage['CognitoIdentityServiceProvider.1ttl3ir4v456e9ari3eqgbjsge.t@t.com.accessToken'])
+    })
+    .then(() => {
+      this.navCtrl.setRoot(HomePage)
     })
     .catch((err: AuthErrors) => {
       if (err == AuthErrors.UserNotFoundError)
@@ -112,8 +127,15 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
 
   private facebook() {
     let modal = this.modalCtrl.create(SocialDeviceLoginPage, {socialLoginProvider: 'Facebook'})
-    modal.onDidDismiss(data => {
-      console.log(data)
+    modal.onDidDismiss(({ accessToken, expiresIn } = {}) => {
+      if (accessToken) {
+        this.facebookSession.setSession({accessToken, expiresIn})
+        this.federatedIdentity.setFederatedIdentitySession(this.facebookSession)
+        this.federatedIdentity.isAuthenticated()
+          .then(() => {
+            this.navCtrl.setRoot(LockscreenPage)
+          })
+      }
     })
     modal.present()
   }

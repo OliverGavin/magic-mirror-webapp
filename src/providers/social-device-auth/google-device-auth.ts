@@ -1,29 +1,32 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { SocialDeviceAuthProvider } from "./social-device-auth";
+import { Injectable, InjectionToken, Inject } from '@angular/core';
+
 import { Subscription } from "rxjs/Subscription";
+
+import { SocialDeviceAuthProvider, SocialDeviceAuthCallbacks } from "./social-device-auth";
+
+
+export const GOOGLE_AUTH_CONFIG_PROVIDER_IT = new InjectionToken<GoogleAuthConfigProvider>('google-auth-config')
+export interface GoogleAuthConfigProvider {
+  GOOGLE_CLIENT_ID: string
+  GOOGLE_CLIENT_SECRET: string
+}
 
 
 @Injectable()
 export class GoogleDeviceAuthProvider implements SocialDeviceAuthProvider {
 
   private static ENDPOINT = 'https://accounts.google.com/o/oauth2/device/code'
-  private static CLIENT_ID = '887293527777-l9fkc42v06atg3jhcp9e6c0jceen43a1.apps.googleusercontent.com'
-  private static CLIENT_SECRET = 'KteCzqxh4rE2pUNj0u4_UeXC'
 
-  constructor(public http: HttpClient) {
+  constructor(public http: HttpClient,
+              @Inject(GOOGLE_AUTH_CONFIG_PROVIDER_IT) private config: GoogleAuthConfigProvider) {
 
   }
 
-  begin(callbacks: {
-          onVerification: (url: string, code: string, qr?: string) => void
-          onSuccess: (token: string, expiresIn: number) => void
-          onTimeout: () => void
-          onError: (err) => void
-        }): Subscription {
+  public begin(callbacks: SocialDeviceAuthCallbacks): Subscription {
 		return this.http
       .post(GoogleDeviceAuthProvider.ENDPOINT, {
-        client_id: GoogleDeviceAuthProvider.CLIENT_ID,
+        client_id: this.config.GOOGLE_CLIENT_ID,
         scope: 'email%20profile'
       })
       .subscribe(

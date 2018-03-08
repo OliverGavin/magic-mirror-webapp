@@ -23,6 +23,7 @@ import 'rxjs/add/observable/empty';
 import 'rxjs/add/operator/windowCount';
 import 'rxjs/add/operator/takeLast';
 import 'rxjs/add/operator/catch';
+import { IDENTITY_PROVIDER_IT, IdentityProvider } from "../../providers/federated-identity/federated-identity";
 
 
 @Component({
@@ -33,17 +34,23 @@ export class LockscreenPage implements OnInit {
   private message: string
   private subscription: Subscription
 
-  constructor(public navCtrl: NavController, public navParams: NavParams,
-              @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider,
-              public deviceAccount: DeviceAccountProvider,
-              public input: InputProvider) {
+  constructor(private navCtrl: NavController, private navParams: NavParams,
+              // @Inject(AUTH_PROVIDER_IT) private auth: AuthProvider,
+              @Inject(IDENTITY_PROVIDER_IT) private identity: IdentityProvider,
+              private deviceAccount: DeviceAccountProvider,
+              private input: InputProvider) {
 
   }
 
   ionViewDidEnter() {
     Promise.resolve()
       .then(() =>
-        this.auth.isAuthenticated()
+        this.deviceAccount.loginDeviceAccount()
+            .then(() => console.log('Logged in to device account'))
+            .catch(() => console.log('Could not log in to device account'))
+      )
+      .then(() =>
+        this.identity.isAuthenticated()
             .then(is => {
               if (!is) {
                 this.navCtrl.push(LoginPage)

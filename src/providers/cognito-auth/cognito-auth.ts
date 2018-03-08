@@ -21,7 +21,7 @@ export class CognitoAuthProvider implements AuthProvider {
 
   // TODO factor out user pool login from this so that an interface can be used with other login providers
 
-  private _user: CognitoUser
+  // private _user: CognitoUser
 
   constructor(@Inject(ENV_PROVIDER_IT) private auth: ICognitoAuthData) {
 
@@ -34,66 +34,66 @@ export class CognitoAuthProvider implements AuthProvider {
     })
   }
 
-  private get identityPoolId(): string {
-    return this.auth.IDENTITY_POOL_ID
-  }
+  // private get identityPoolId(): string {
+  //   return this.auth.IDENTITY_POOL_ID
+  // }
 
-  public get user(): CognitoUser {
-    return this._user
-  }
+  // public get user(): CognitoUser {
+  //   return this._user
+  // }
 
-  public getSession(): Promise<CognitoUserSession> {
-    this._user || (this._user = this.userPool.getCurrentUser())
-    return new Promise<CognitoUserSession>((resolve, reject) => {
-      if (!this._user) {
-        reject(AuthErrors.UserNotLoggedIn)
-        return
-      }
+  // public getSession(): Promise<CognitoUserSession> {
+  //   this._user || (this._user = this.userPool.getCurrentUser())
+  //   return new Promise<CognitoUserSession>((resolve, reject) => {
+  //     if (!this._user) {
+  //       reject(AuthErrors.UserNotLoggedIn)
+  //       return
+  //     }
+  //
+  //     this._user.getSession((err, session: CognitoUserSession) => {
+  //       if(err) {
+  //         reject(AuthErrors.NoSessionFound)
+  //         return
+  //       }
+  //       if(!session.isValid()) {
+  //         reject(AuthErrors.SessionExpiredOrInvalid)
+  //         return
+  //       }
+  //
+  //       // // TODO more efficient? not every time? swapping users, etc
+  //       // AWS.config.region = this.auth.REGION
+  //       //
+  //       // let logins = {}
+  //       // let endpoint = `cognito-idp.${this.auth.REGION}.amazonaws.com/${this.auth.USER_POOL_ID}`
+  //       // logins[endpoint] = session.getIdToken().getJwtToken()
+  //       //
+  //       // AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+  //       //     IdentityPoolId : this.auth.IDENTITY_POOL_ID,
+  //       //     Logins : logins,
+  //       //     // LoginId: 'w@w.com'  // TODO investigate purpose? - possibly required for multiple sessions/users, not email?
+  //       // });
+  //       //
+  //       // (<AWS.CognitoIdentityCredentials>AWS.config.credentials).getPromise().then(() => {
+  //         resolve(session)
+  //       // }).catch((err) => {
+  //       //   reject('Failed to obtain AWS credentials')
+  //       // })
+  //
+  //     })
+  //
+  //   })
+  // }
 
-      this._user.getSession((err, session: CognitoUserSession) => {
-        if(err) {
-          reject(AuthErrors.NoSessionFound)
-          return
-        }
-        if(!session.isValid()) {
-          reject(AuthErrors.SessionExpiredOrInvalid)
-          return
-        }
-
-        // TODO more efficient? not every time? swapping users, etc
-        AWS.config.region = this.auth.REGION
-
-        let logins = {}
-        let endpoint = `cognito-idp.${this.auth.REGION}.amazonaws.com/${this.auth.USER_POOL_ID}`
-        logins[endpoint] = session.getIdToken().getJwtToken()
-
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId : this.auth.IDENTITY_POOL_ID,
-            Logins : logins,
-            // LoginId: 'w@w.com'  // TODO investigate purpose? - possibly required for multiple sessions/users, not email?
-        });
-
-        (<AWS.CognitoIdentityCredentials>AWS.config.credentials).getPromise().then(() => {
-          resolve(session)
-        }).catch((err) => {
-          reject('Failed to obtain AWS credentials')
-        })
-
-      })
-
-    })
-  }
-
-  public isAuthenticated(): Promise<boolean> {
-    return new Promise<boolean>((resolve, reject) => {
-      this.getSession()
-        .then((_) => resolve(true))
-        .catch(err => {
-          [AuthErrors.UserNotLoggedIn, AuthErrors.NoSessionFound, AuthErrors.SessionExpiredOrInvalid].includes(err) ?
-            resolve(false) : reject(err)
-        })
-    })
-  }
+  // public isAuthenticated(): Promise<boolean> {
+  //   return new Promise<boolean>((resolve, reject) => {
+  //     this.getSession()
+  //       .then((_) => resolve(true))
+  //       .catch(err => {
+  //         [AuthErrors.UserNotLoggedIn, AuthErrors.NoSessionFound, AuthErrors.SessionExpiredOrInvalid].includes(err) ?
+  //           resolve(false) : reject(err)
+  //       })
+  //   })
+  // }
 
   // public isAuthenticated(): Promise<void> {
   //   return new Promise<void>((resolve, reject) => {
@@ -109,9 +109,10 @@ export class CognitoAuthProvider implements AuthProvider {
 
   public getJwtIdToken(): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      this.getSession().then((session: CognitoUserSession) => {
-        resolve(session.getIdToken().getJwtToken())
-      })
+      resolve('use identity id...')
+      // this.getSession().then((session: CognitoUserSession) => {
+      //   resolve(session.getIdToken().getJwtToken())
+      // })
     })
   }
 
@@ -134,7 +135,7 @@ export class CognitoAuthProvider implements AuthProvider {
           console.log(err)
           return
         }
-        this._user = result.user
+        // this._user = result.user
         resolve()
       })
     })
@@ -147,18 +148,20 @@ export class CognitoAuthProvider implements AuthProvider {
       Password: loginData.password
     })
 
-    this._user = new CognitoUser({
+    let user = new CognitoUser({
       Username: loginData.email,
       Pool: this.userPool
     })
 
     return new Promise<void>((resolve, reject) => {
-      this._user.authenticateUser(authenticationDetails, {
+      user.authenticateUser(authenticationDetails, {
         onSuccess: (session: CognitoUserSession, userTrackingConfirmationNecessary: boolean) => {
           console.log('access token + ' + session.getAccessToken().getJwtToken());
 
-          return this.getSession()
-                     .then(() => { resolve() })  // catch?
+          // return this.getSession()
+          //            .then(() => { resolve() })  // catch?
+
+          resolve()
 
         },
         onFailure: (err) => {

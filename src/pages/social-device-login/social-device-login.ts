@@ -46,8 +46,8 @@ export class SocialDeviceLoginPage {
         this.code = code
         this.qr = qr || url
       },
-      onSuccess: (token, expiresIn) => {
-        this.dismiss({token, expiresIn})
+      onSuccess: (data) => {
+        this.dismiss(data)
       },
       onTimeout: () => {
         this.toastCtrl.create({
