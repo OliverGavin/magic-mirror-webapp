@@ -8,6 +8,8 @@ import "rxjs/add/operator/map"
 import { AUTH_PROVIDER_IT, AuthProvider } from "../auth/auth";
 import { PROFILE_PROVIDER_IT, ProfileProvider } from "../profile/profile";
 import { ENV_PROVIDER_IT } from "../../environment/environment";
+import { FederatedIdentityProvider, FederatedIdentitySession } from "../federated-identity/federated-identity";
+import { FederatedIdentitySessionMapper } from "../federated-identity/federated-identity-session-mapper";
 
 
 export class IApiConfigData {
@@ -33,7 +35,9 @@ export class DeviceAccountProvider {
 
   constructor(public http: HttpClient, private storage: Storage,
               @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider,
-              @Inject(PROFILE_PROVIDER_IT) public profile: ProfileProvider,
+              // @Inject(PROFILE_PROVIDER_IT) public profile: ProfileProvider,
+              private federatedIdentity: FederatedIdentityProvider,
+              private sessionProviders: FederatedIdentitySessionMapper,
               @Inject(ENV_PROVIDER_IT) private apiConfig: IApiConfigData) {
 
   }
@@ -50,6 +54,34 @@ export class DeviceAccountProvider {
 
   private setDeviceGroupId(value: string): Promise<void> {
     return this.storage.set('DeviceAccount:DeviceGroupId', value)
+  }
+
+  private getDeviceAccountLoginProvider(): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      this.storage.get('DeviceAccount:LoginProvider').then((v) => {
+        if (v == null)
+          reject()
+        resolve(v)
+      })
+    })
+  }
+
+  private setDeviceAccountLoginProvider(value: string): Promise<void> {
+    return this.storage.set('DeviceAccount:LoginProvider', value)
+  }
+
+  private getDeviceAccountSessionData(): Promise<{}> {
+    return new Promise<{}>((resolve, reject) => {
+      this.storage.get('DeviceAccount:SessionData').then((v) => {
+        if (v == null)
+          reject()
+        resolve(v)
+      })
+    })
+  }
+
+  private setDeviceAccountSessionData(value: {}): Promise<void> {
+    return this.storage.set('DeviceAccount:SessionData', value)
   }
 
   public isConfigured(): Promise<boolean> {
@@ -69,24 +101,45 @@ export class DeviceAccountProvider {
 
   public isUserConfigured(): Promise<boolean> {
     return new Promise<boolean>((resolve, reject) => {
-      Promise.all([this.profile.getId(), this.getDeviceGroupId()])
+      Promise.all([this.federatedIdentity.getIdentityId(), this.getDeviceGroupId()])
         .then(([userId, groupId]) => {
           return this.http
             .get(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/users/${userId}`)
             .toPromise()
         })
-        .then(data => resolve(data['faceNum'] > 6))
+        .then(data => resolve(data['faceNum'] >= 6))
         .catch(err => reject(err))
     })
   }
 
-  public loginDeviceAccount() {
+  public loginDeviceAccount(): Promise<void> {
     // restore credentials
+    return new Promise<void>((resolve, reject) => {
+      // Promise.all([this.getDeviceGroupOwnerToken(), this.getDeviceGroupOwnerIdentityId()])
+      //   .then(([token, identityId]) => {
+      //     this.deviceSession.setSession({accessToken: token, expiresIn: 0})
+      //     this.deviceSession.setIdentityId(identityId)
+      //     this.federatedIdentity.setFederatedIdentitySession(this.deviceSession)
+      //     return this.federatedIdentity.getSession()
+      //   })
+      Promise.all<string, {}>([this.getDeviceAccountLoginProvider(), this.getDeviceAccountSessionData()])
+        .then(([provider, session]) => {
+          let sessionProvider = this.sessionProviders.get(provider)
+          sessionProvider.setSession(session)
+          this.federatedIdentity.setFederatedIdentitySession(sessionProvider)
+          return this.federatedIdentity.getSession()
+        })
+        .then(() => resolve())
+        .catch(err => reject(err))
+    })
   }
 
-  public loginUserAccount() {
+  public loginUserAccount(token: string): Promise<void> {
     // image auth
     // load credentials
+    return new Promise<void>((resolve, reject) => {
+      reject()
+    })
   }
 
   public getDeviceGroups(): Promise<Array<IDeviceGroupData>> {
@@ -108,8 +161,47 @@ export class DeviceAccountProvider {
       .toPromise()
   }
 
+  public selectDeviceAccount(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      // Promise.all([this.federatedIdentity.getFederatedIdentitySession().getLoginProvider(),
+      //              this.federatedIdentity.getFederatedIdentitySession().getLoginToken()])
+      //   .then(([provider, token]) =>
+      //     this.http
+      //       .post(this.apiConfig.API_ENDPOINT + `/api/openid/token`, {
+      //         provider: provider,
+      //         token: token
+      //       })
+      //       // .map(response => (<string> response['token']))
+      //       .toPromise()
+      //   )
+      //   .then(({ token, identityId }) => {
+      //     console.log(token, identityId)
+      //     return Promise.all([
+      //       this.setDeviceGroupOwnerToken(token),
+      //       this.setDeviceGroupOwnerIdentityId(identityId)
+      //     ])
+      //   })
+      //   .then(() => this.loginDeviceAccount())
+      //   .then(() => resolve())
+      //   .catch(err => reject(err))
+
+      let session: FederatedIdentitySession = this.federatedIdentity.getFederatedIdentitySession()
+      let provider = session.getLoginProvider()
+      let sessionData = session.getSession()
+
+      Promise.all([
+        this.setDeviceAccountLoginProvider(provider),
+        this.setDeviceAccountSessionData(sessionData)
+      ])
+      .then(() => this.loginDeviceAccount())
+      .then(() => resolve())
+      .catch(err => reject(err))
+    })
+  }
+
   public selectDeviceGroup(group: IDeviceGroupData): Promise<void> {
-    return this.setDeviceGroupId(group.id)
+    return this.selectDeviceAccount()
+      .then(() => this.setDeviceGroupId(group.id))
   }
 
   public joinDeviceGroup(): Promise<IDeviceGroupUserData> {
@@ -129,11 +221,14 @@ export class DeviceAccountProvider {
 
   public registerUserFace(faces: Array<string>): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      Promise.all([this.profile.getId(), this.getDeviceGroupId(), this.auth.getJwtIdToken()])
-        .then(([userId, groupId, token]) =>
+      Promise.all([this.federatedIdentity.getIdentityId(), this.getDeviceGroupId(),
+                   this.federatedIdentity.getFederatedIdentitySession().getLoginProvider(),
+                   this.federatedIdentity.getFederatedIdentitySession().getLoginToken()])
+        .then(([userId, groupId, provider, token]) =>
           this.http
             .post(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/users/${userId}/faces`, {
               faces: faces,
+              provider: provider,
               token: token
             })
             .toPromise()

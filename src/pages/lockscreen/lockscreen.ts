@@ -20,9 +20,14 @@ import { SpeechComponent } from "../../components/speech/speech";
 
 import 'rxjs/add/observable/fromPromise';
 import 'rxjs/add/observable/empty';
+import 'rxjs/add/operator/switchMap';
+import 'rxjs/add/operator/mergeMap';
+import 'rxjs/add/operator/skipWhile';
+import 'rxjs/add/operator/delay';
 import 'rxjs/add/operator/windowCount';
 import 'rxjs/add/operator/takeLast';
 import 'rxjs/add/operator/catch';
+import { IDENTITY_PROVIDER_IT, IdentityProvider } from "../../providers/federated-identity/federated-identity";
 
 
 @Component({
@@ -33,49 +38,113 @@ export class LockscreenPage implements OnInit {
   private message: string
   private subscription: Subscription
 
-  constructor(public navCtrl: NavController, public navParams: NavParams,
-              @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider,
-              public deviceAccount: DeviceAccountProvider,
-              public input: InputProvider) {
+  private busy = false
+
+  constructor(private navCtrl: NavController, private navParams: NavParams,
+              // @Inject(AUTH_PROVIDER_IT) private auth: AuthProvider,
+              @Inject(IDENTITY_PROVIDER_IT) private identity: IdentityProvider,
+              private deviceAccount: DeviceAccountProvider,
+              private input: InputProvider) {
 
   }
 
   ionViewDidEnter() {
-    Promise.resolve()
-      .then(() =>
-        this.auth.isAuthenticated()
-            .then(is => {
-              if (!is) {
-                this.navCtrl.push(LoginPage)
-                throw 'Skip'
-              }
-            })
-      )
-      .then(() =>
-        this.deviceAccount.isConfigured()
-            .then(is => {
-              if (!is) {
-                this.navCtrl.push(DeviceGroupSetupPage)
-                throw 'Skip'
-              }
-            })
-      )
-      .then(() =>
-        this.deviceAccount.isUserConfigured()
-            .then(is => {
-              if (!is) {
-                this.navCtrl.push(UserProfileSetupPage)
-                throw 'Skip'
-              }
-            })
-      )
-      .then(() =>
+    this.handle()
+    // Promise.resolve()
+    //   .then(() =>
+    //     this.deviceAccount.loginDeviceAccount()
+    //         .then(() => console.log('Logged in to device account'))
+    //         .catch(() => console.log('Could not log in to device account'))
+    //   )
+    //   .then(() =>
+    //     this.identity.isAuthenticated()
+    //         .then(is => {
+    //           if (!is) {
+    //             this.navCtrl.push(LoginPage)
+    //             throw 'Skip'
+    //           }
+    //         })
+    //   )
+    //   .then(() =>
+    //     this.deviceAccount.isConfigured()
+    //         .then(is => {
+    //           if (!is) {
+    //             this.navCtrl.push(DeviceGroupSetupPage)
+    //             throw 'Skip'
+    //           }
+    //         })
+    //   )
+    //   .then(() =>
+    //     this.deviceAccount.isUserConfigured()
+    //         .then(is => {
+    //           if (!is) {
+    //             this.navCtrl.push(UserProfileSetupPage)
+    //             throw 'Skip'
+    //           }
+    //         })
+    //   )
+    //   .then(() =>
+    //     this.waitForFaceAuth(
+    //       () => this.navCtrl.setRoot(HomePage),
+    //       () => this.message = "Hello, I don't think we've met?"
+    //     )
+    //   )
+    //   .catch(err => {if(err != 'Skip') console.log(err)})
+  }
+
+  async handle() {
+    this.busy = false
+    this.message = null
+    try {
+
+      await this.deviceAccount.loginDeviceAccount()
+              .then(() =>
+                console.log('Logged in to device account')
+              )
+              .catch(err =>
+                console.log(err)
+              )
+
+      if (!await this.identity.isAuthenticated()) {
+        this.navCtrl.push(LoginPage)
+      }
+
+      // else if (!await this.deviceAccount.isConfigured()) {
+      //   this.navCtrl.push(DeviceGroupSetupPage)
+      // }
+      //
+      // else if (!await this.deviceAccount.isUserConfigured()) {
+      //   this.navCtrl.push(UserProfileSetupPage)
+      // }
+
+      else {
+        console.log('herererererererere')
         this.waitForFaceAuth(
           () => this.navCtrl.setRoot(HomePage),
-          () => this.message = "Hello, I don't think we've met?"
+          () => {
+            this.busy = true
+            this.message = "Hello, I don't think we've met?"
+            console.log(this.message)
+            Observable.of('')
+              .delay(3000)
+              .mergeMap((value, index) => {
+                this.message = "Would you like to create an account?"
+                console.log(this.message)
+                return Observable.of(value)
+              })
+              .delay(3000)
+              .subscribe(() => {
+                console.log('login??')
+                this.navCtrl.push(LoginPage)
+                // TODO unsubscribe
+              })
+          }
         )
-      )
-      .catch(err => {if(err != 'Skip') console.log(err)})
+      }
+
+    } catch(err) {
+      console.log(err)
+    }
   }
 
   waitForFaceAuth(onSuccess: () => void, onFailure?: () => void) {
@@ -100,7 +169,7 @@ export class LockscreenPage implements OnInit {
         return i.width >= 80 && i.height >= 80
       })
       .switchMap(({ face }) => {
-        return Observable.fromPromise(this.deviceAccount.authenticateUserFace(face))
+        return this.busy ? Observable.empty() : Observable.fromPromise(this.deviceAccount.authenticateUserFace(face))
           .catch(err => {
             subject.next()
             return Observable.empty()

@@ -1,7 +1,7 @@
-import { Pipe, PipeTransform } from '@angular/core';
+import { Pipe, PipeTransform, Inject } from '@angular/core';
 import { PollyProvider } from '../../providers/polly/polly'
 import { SynthesizeSpeechOutput } from "aws-sdk/clients/polly";
-import { CognitoAuthProvider } from "../../providers/cognito-auth/cognito-auth";
+import { IDENTITY_PROVIDER_IT, IdentityProvider } from "../../providers/federated-identity/federated-identity";
 
 
 export interface IPollyTextData {
@@ -15,7 +15,7 @@ export interface IPollyTextData {
 })
 export class PollyPipe implements PipeTransform {
 
-  constructor(private auth: CognitoAuthProvider, private polly: PollyProvider) {
+  constructor(@Inject(IDENTITY_PROVIDER_IT)private identity: IdentityProvider, private polly: PollyProvider) {
 
   }
 
@@ -25,7 +25,7 @@ export class PollyPipe implements PipeTransform {
     [text, type] = value && value.text && value.ssml ? [value.ssml, 'ssml'] : [value, 'text']
 
     if (text)
-      this.auth.getSession().then(() => {
+      this.identity.isAuthenticated().then(() => {
         this.polly.textToSpeech(text, type)
           .then((audio: SynthesizeSpeechOutput) => {
             let player = new Audio()

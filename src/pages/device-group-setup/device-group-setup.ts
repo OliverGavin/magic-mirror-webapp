@@ -24,7 +24,10 @@ export class DeviceGroupSetupPage implements OnInit {
       .then((groups: Array<IDeviceGroupData>) => {
         this.groups = groups
       })
-      .catch(err => console.log('Could not load device groups.'))
+      .catch(err => {
+        console.log('Could not load device groups.')
+        console.log(err)
+      })
   }
 
   private showCreateGroupDialog() {
@@ -56,13 +59,20 @@ export class DeviceGroupSetupPage implements OnInit {
       .then((group: IDeviceGroupData) => {
         this.selectGroup(group)
       })
+      .catch(err => {
+        console.log('Could not create device group.')
+        console.log(err)
+      })
   }
 
   private selectGroup(group: IDeviceGroupData) {
     this.deviceAccount.selectDeviceGroup(group).then(() => {
       this.navCtrl.pop()
     })
-    // this.navCtrl.setRoot(UserProfileSetupPage)
+    .catch(err => {
+      console.log('Could not select device group.')
+      console.log(err)
+    })
   }
 
 }

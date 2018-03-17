@@ -6,6 +6,15 @@ import { HomePage } from '../home/home'
 import { AUTH_PROVIDER_IT, AuthProvider, AuthErrors } from '../../providers/auth/auth'
 import { PasswordValidators } from '../../util/forms/validators'
 import { SocialDeviceLoginPage } from "../social-device-login/social-device-login";
+import { FederatedIdentityProvider } from "../../providers/federated-identity/federated-identity";
+import { CognitoSession } from "../../providers/federated-identity/cognito-session";
+import { FacebookSession } from "../../providers/federated-identity/facebook-session";
+import * as AWS from "aws-sdk";
+import { LockscreenPage } from "../lockscreen/lockscreen";
+import { DeviceGroupSetupPage } from "../device-group-setup/device-group-setup";
+import { UserProfileSetupPage } from "../user-profile-setup/user-profile-setup";
+import { DeviceAccountProvider } from "../../providers/device-account/device-account";
+import { GoogleSession } from "../../providers/federated-identity/google-session";
 
 
 @Component({
@@ -17,10 +26,15 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
   private form: FormGroup
   private registering: boolean = true
 
-  constructor(public navCtrl: NavController, public navParams: NavParams,
+  constructor(private navCtrl: NavController, private navParams: NavParams,
               private modalCtrl : ModalController,
-              public formBuilder: FormBuilder,
-              @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider) {
+              private formBuilder: FormBuilder,
+              @Inject(AUTH_PROVIDER_IT) private auth: AuthProvider,
+              private deviceAccount: DeviceAccountProvider,
+              private federatedIdentity: FederatedIdentityProvider,
+              private cognitoSession: CognitoSession,
+              private facebookSession: FacebookSession,
+              private googleSession: GoogleSession) {
   }
 
   ngOnInit(): void {
@@ -59,8 +73,19 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
       password: this.password.value
     })
     .then(() => {
-      this.navCtrl.setRoot(HomePage);
+      this.federatedIdentity.setFederatedIdentitySession(this.cognitoSession)
+      this.federatedIdentity.isAuthenticated()
+        .then(() => {
+          // this.navCtrl.setRoot(LockscreenPage)
+          this.continue()
+        })
+      // let test = (<AWS.CognitoIdentityCredentials>AWS.config.credentials)
+      // debugger
+      // console.log(window.localStorage['CognitoIdentityServiceProvider.1ttl3ir4v456e9ari3eqgbjsge.t@t.com.accessToken'])
     })
+    // .then(() => {
+    //   this.navCtrl.setRoot(HomePage)
+    // })
     .catch((err: AuthErrors) => {
       if (err == AuthErrors.UserNotFoundError)
         this.email.setErrors({
@@ -104,18 +129,66 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
 
   private google() {
     let modal = this.modalCtrl.create(SocialDeviceLoginPage, {socialLoginProvider: 'Google'})
-    modal.onDidDismiss(data => {
-      console.log(data)
+    modal.onDidDismiss(({ accessToken, expiresIn, refreshToken, idToken } = {}) => {
+      if (accessToken) {
+        this.googleSession.setSession({accessToken, expiresIn, refreshToken, idToken})
+        this.federatedIdentity.setFederatedIdentitySession(this.googleSession)
+        this.federatedIdentity.isAuthenticated()
+          .then(() => {
+            // this.navCtrl.setRoot(LockscreenPage)
+            this.continue()
+          })
+      }
     })
     modal.present()
   }
 
   private facebook() {
     let modal = this.modalCtrl.create(SocialDeviceLoginPage, {socialLoginProvider: 'Facebook'})
-    modal.onDidDismiss(data => {
-      console.log(data)
+    modal.onDidDismiss(({ accessToken, expiresIn } = {}) => {
+      if (accessToken) {
+        this.facebookSession.setSession({accessToken, expiresIn})
+        this.federatedIdentity.setFederatedIdentitySession(this.facebookSession)
+        this.federatedIdentity.isAuthenticated()
+          .then(() => {
+            // this.navCtrl.setRoot(LockscreenPage)
+            this.continue()
+          })
+      }
     })
     modal.present()
+  }
+
+  private async continue() {
+    if (!await this.deviceAccount.isConfigured()) {
+      let modal = this.modalCtrl.create(DeviceGroupSetupPage)
+      modal.onDidDismiss(async () => {
+        if (await this.deviceAccount.isConfigured()) {
+          if (!await this.deviceAccount.isUserConfigured()) {
+            let modal = this.modalCtrl.create(UserProfileSetupPage)
+            modal.onDidDismiss(async () => {
+              if (await this.deviceAccount.isUserConfigured()) {
+                this.navCtrl.pop()
+              }
+            })
+            modal.present()
+          } else {
+            this.navCtrl.pop()
+          }
+        }
+      })
+      modal.present()
+    } else if (!await this.deviceAccount.isUserConfigured()) {
+      let modal = this.modalCtrl.create(UserProfileSetupPage)
+      modal.onDidDismiss(async () => {
+        if (await this.deviceAccount.isUserConfigured()) {
+          this.navCtrl.pop()
+        }
+      })
+      modal.present()
+    } else {
+      this.navCtrl.pop()
+    }
   }
 
    private errors = {

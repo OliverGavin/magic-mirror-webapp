@@ -23,15 +23,21 @@ import { SpeechComponent } from "../components/speech/speech";
 import { ENV_PROVIDER_IT, environment} from '../environment/environment'
 import { AUTH_PROVIDER_IT } from '../providers/auth/auth';
 import { CognitoAuthProvider } from '../providers/cognito-auth/cognito-auth';
-import { CognitoAuthInterceptor } from '../providers/cognito-auth-interceptor/cognito-auth-interceptor';
+import { IAMAuthInterceptor } from '../providers/iam-auth-interceptor/iam-auth-interceptor';
 import { PROFILE_PROVIDER_IT } from '../providers/profile/profile';
 import { CognitoProfileProvider } from '../providers/cognito-profile/cognito-profile';
 import { DeviceAccountProvider } from '../providers/device-account/device-account';
 import { InputProvider } from '../providers/input/input';
 import { PollyProvider } from '../providers/polly/polly';
 import { PollyPipe } from "../pipes/polly/polly";
-import { GoogleDeviceAuthProvider } from '../providers/social-device-auth/google-device-auth';
-import { FacebookDeviceAuthProvider } from '../providers/social-device-auth/facebook-device-auth';
+import { GoogleDeviceAuthProvider, GOOGLE_AUTH_CONFIG_PROVIDER_IT } from '../providers/social-device-auth/google-device-auth';
+import { FacebookDeviceAuthProvider, FACEBOOK_AUTH_CONFIG_PROVIDER_IT } from '../providers/social-device-auth/facebook-device-auth';
+import { FederatedIdentityProvider, IDENTITY_PROVIDER_IT } from '../providers/federated-identity/federated-identity';
+import { FacebookSession } from "../providers/federated-identity/facebook-session";
+import { CognitoSession } from "../providers/federated-identity/cognito-session";
+import { DeviceSession } from "../providers/federated-identity/device-session";
+import { FederatedIdentitySessionMapper } from "../providers/federated-identity/federated-identity-session-mapper";
+import { GoogleSession } from "../providers/federated-identity/google-session";
 
 @NgModule({
   declarations: [
@@ -77,12 +83,21 @@ import { FacebookDeviceAuthProvider } from '../providers/social-device-auth/face
     DeviceAccountProvider,
     {
       provide: HTTP_INTERCEPTORS,
-      useClass: CognitoAuthInterceptor,
+      useClass: IAMAuthInterceptor,
       multi: true
     },
     PollyProvider,
+    {provide: GOOGLE_AUTH_CONFIG_PROVIDER_IT, useValue: environment},
     GoogleDeviceAuthProvider,
-    FacebookDeviceAuthProvider
+    {provide: FACEBOOK_AUTH_CONFIG_PROVIDER_IT, useValue: environment},
+    FacebookDeviceAuthProvider,
+    FederatedIdentityProvider,
+    {provide: IDENTITY_PROVIDER_IT, useExisting: FederatedIdentityProvider},
+    GoogleSession,
+    FacebookSession,
+    CognitoSession,
+    DeviceSession,
+    FederatedIdentitySessionMapper
 
   ]
 })

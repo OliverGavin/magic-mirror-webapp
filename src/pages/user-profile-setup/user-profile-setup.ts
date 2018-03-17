@@ -21,15 +21,15 @@ export class UserProfileSetupPage implements OnInit {
   public faces: Array<string> = []
 
   constructor(public navCtrl: NavController, public navParams: NavParams,
-              @Inject(PROFILE_PROVIDER_IT) public profile: ProfileProvider,
+              // @Inject(PROFILE_PROVIDER_IT) public profile: ProfileProvider,
               public deviceAccount: DeviceAccountProvider,
               public input: InputProvider) {
 
-    this.profile.getName().then(value => {
-      console.log(value)
-    }).catch(reason => {
-      console.log(reason)
-    })
+    // this.profile.getName().then(value => {
+    //   console.log(value)
+    // }).catch(reason => {
+    //   console.log(reason)
+    // })
 
   }
 
@@ -48,15 +48,18 @@ export class UserProfileSetupPage implements OnInit {
       ).filter(({ i }) =>  {
         return i.width >= 80 && i.height >= 80
       })
-      .take(10)
+      // .take(10)
+      .take(6)
       .subscribe(({ face }) => {
         this.faces.push(face)
       })
       .add(() => {
         this.deviceAccount.registerUserFace(this.faces)
           .then(() => this.navCtrl.pop())
-          .catch(err => {})
+          .catch(err => console.log(err))
       })
+
+      // TODO retry on fail?
   }
 
 }
