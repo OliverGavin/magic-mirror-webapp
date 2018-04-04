@@ -34,6 +34,9 @@ export class GoogleDeviceAuthProvider implements SocialDeviceAuthProvider {
   }
 
   public begin(callbacks: SocialDeviceAuthCallbacks): Subscription {
+
+    let now = new Date()
+
 		return this.http
       .post(GoogleDeviceAuthProvider.INIT_ENDPOINT,
             `client_id=${this.config.GOOGLE_CLIENT_ID}&scope=profile`,
@@ -82,7 +85,7 @@ export class GoogleDeviceAuthProvider implements SocialDeviceAuthProvider {
       .subscribe(
         data => callbacks.onSuccess({
           accessToken: data['access_token'],
-          expiresIn: data['expires_in'],
+          expires: now.getTime() + data['expires_in'] * 1000,
           refreshToken: data['refresh_token'],
           idToken: data['id_token']
         }),

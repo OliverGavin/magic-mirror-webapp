@@ -1,12 +1,14 @@
 import { Injectable, Inject } from '@angular/core';
 
-import { FederatedIdentitySession } from "./federated-identity";
-import { ENV_PROVIDER_IT } from "../../environment/environment";
+import { Subject } from 'rxjs';
+
+import { IFederatedIdentitySession } from '../federated-identity';
+import { ENV_PROVIDER_IT } from '../../../environment/environment';
 
 
 export interface IDeviceSessionData {
   accessToken: string
-  expiresIn: number
+  expires: number
 }
 
 
@@ -16,14 +18,13 @@ export class DeviceSessionConfigProvider {
 
 
 @Injectable()
-export class DeviceSession implements FederatedIdentitySession {
+export class DeviceSession implements IFederatedIdentitySession {
 
   private session: IDeviceSessionData
   private identityId: string
 
   constructor(@Inject(ENV_PROVIDER_IT) private config: DeviceSessionConfigProvider) {
-    // TODO expiry?
-    // DEVELOPER_PROVIDER_NAME
+
   }
 
   public getSession(): IDeviceSessionData {
@@ -49,10 +50,13 @@ export class DeviceSession implements FederatedIdentitySession {
 
 	public getLoginToken(): Promise<string> {
     // TODO refresh, verify etc
-    // AWS.config.credentials.params.Logins['graph.facebook.com'] = updatedToken;
     return new Promise<string>((resolve, reject) => {
       resolve(this.session.accessToken)
     })
+	}
+
+	onUpdate(): Subject<{}> {  // no-op since these are temporary credentials we don't want to write
+		return new Subject()
 	}
 
 }

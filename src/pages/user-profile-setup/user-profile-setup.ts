@@ -1,14 +1,16 @@
-import { Component, Inject, OnInit } from '@angular/core';
-import { NavController, NavParams } from 'ionic-angular';
+import { Component, Inject, NgZone } from '@angular/core';
+import { NavController, NavParams, ViewController } from 'ionic-angular';
+
 import { Subscription } from "rxjs/Subscription";
 import { Observable } from "rxjs/Observable";
 import 'rxjs/add/operator/throttleTime';
 import 'rxjs/add/operator/filter';
 import 'rxjs/add/operator/take';
+import 'rxjs/add/operator/retryWhen';
+import 'rxjs/add/operator/bufferCount';
 import 'rxjs/add/operator/mergeMap';
 import 'rxjs/add/operator/switchMap';
 
-import { PROFILE_PROVIDER_IT, ProfileProvider } from "../../providers/profile/profile";
 import { DeviceAccountProvider } from "../../providers/device-account/device-account";
 import { InputProvider } from "../../providers/input/input";
 
@@ -17,49 +19,63 @@ import { InputProvider } from "../../providers/input/input";
   selector: 'page-user-profile-setup',
   templateUrl: 'user-profile-setup.html',
 })
-export class UserProfileSetupPage implements OnInit {
-  public faces: Array<string> = []
+export class UserProfileSetupPage {
+  private faces: Array<string> = []
+  private messageAsync: Observable<string>
 
-  constructor(public navCtrl: NavController, public navParams: NavParams,
-              // @Inject(PROFILE_PROVIDER_IT) public profile: ProfileProvider,
-              public deviceAccount: DeviceAccountProvider,
-              public input: InputProvider) {
-
-    // this.profile.getName().then(value => {
-    //   console.log(value)
-    // }).catch(reason => {
-    //   console.log(reason)
-    // })
+  constructor(private navCtrl: NavController, private navParams: NavParams,
+              private viewCtrl: ViewController,
+              private zone: NgZone,
+              private deviceAccount: DeviceAccountProvider,
+              private input: InputProvider) {
 
   }
 
-  ngOnInit(): void {
-    this.input.getFaces()
+  ionViewDidEnter(): void {
+    let attempts = 0
+    this.messageAsync = Observable.from(["I just need to take your picture before we get started", "Please look into the camera"])
+    Observable.of(null).delay(5000)
+      .switchMap(() => this.input.getFaces())
       .throttleTime(500)
-      .switchMap(face =>
-
+      .flatMap(face =>
           new Observable<HTMLImageElement>(observer => {
-            var i = new Image()
+            console.log('xxx')
+            let i = new Image()
             i.onload = () => observer.next(i)
             i.src = 'data:image/jpeg;charset=utf-8;base64,' + face
           })
-          .map(i => ({ face, i }))
-
-      ).filter(({ i }) =>  {
-        return i.width >= 80 && i.height >= 80
+          .filter(i => i.width >= 80 && i.height >= 80)
+          .map(() => face)
+      )
+      .do(face => {
+        this.zone.run(() => {
+          this.faces.push(face)
+        })
       })
-      // .take(10)
       .take(6)
-      .subscribe(({ face }) => {
-        this.faces.push(face)
+      .bufferCount(6)
+      .concatMap(faces => Observable.fromPromise(this.deviceAccount.registerUserFace(faces)))
+      .catch((err, caught) => {
+        this.faces = []
+        let message = ["Lets try that again?", "OK, once more...", ""][attempts++]
+        this.messageAsync = Observable.from([message])
+        return Observable.of(null)
+          .delay(5000)
+          .concatMap(() => {throw caught})
       })
-      .add(() => {
-        this.deviceAccount.registerUserFace(this.faces)
-          .then(() => this.navCtrl.pop())
-          .catch(err => console.log(err))
-      })
+      .retry(2)
+      .subscribe(faces => {
+          this.viewCtrl.dismiss()
+        },
+        err => {
+          console.log(err)
+          this.messageAsync = Observable.from(["Sorry, I cannot continue", "Please try again later"])
+          Observable.of(null)
+            .delay(5000)
+            .subscribe(() => {this.viewCtrl.dismiss()})
+        }
+      )
 
-      // TODO retry on fail?
   }
 
 }

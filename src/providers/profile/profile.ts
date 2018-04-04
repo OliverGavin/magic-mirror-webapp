@@ -3,6 +3,7 @@ import { InjectionToken } from '@angular/core'
 
 export const PROFILE_PROVIDER_IT = new InjectionToken<ProfileProvider>('profile')
 export interface ProfileProvider {
-  getName(): Promise<string>
-  getId(): Promise<string>
+  getFirstName(): Promise<string>
+  getLastName(): Promise<string>
+  getPicture(): Promise<string>
 }

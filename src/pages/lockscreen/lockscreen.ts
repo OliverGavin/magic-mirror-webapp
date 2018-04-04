@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, NgZone } from '@angular/core';
 import { NavController, NavParams } from 'ionic-angular';
 
 import { Observable } from "rxjs/Observable";
@@ -22,7 +22,9 @@ import 'rxjs/add/observable/fromPromise';
 import 'rxjs/add/observable/empty';
 import 'rxjs/add/operator/switchMap';
 import 'rxjs/add/operator/mergeMap';
+import 'rxjs/add/operator/concatMap';
 import 'rxjs/add/operator/skipWhile';
+import 'rxjs/add/operator/throttleTime';
 import 'rxjs/add/operator/delay';
 import 'rxjs/add/operator/windowCount';
 import 'rxjs/add/operator/takeLast';
@@ -34,14 +36,16 @@ import { IDENTITY_PROVIDER_IT, IdentityProvider } from "../../providers/federate
   selector: 'page-lockscreen',
   templateUrl: 'lockscreen.html'
 })
-export class LockscreenPage implements OnInit {
-  private message: string
-  private subscription: Subscription
+export class LockscreenPage {
+  private subject: Subject<any> = new Subject()
+  private faceSubscription: Subscription
+  private i = 0
+  private messageAsync: Observable<string>
 
-  private busy = false
+  private signinDialog = false
 
   constructor(private navCtrl: NavController, private navParams: NavParams,
-              // @Inject(AUTH_PROVIDER_IT) private auth: AuthProvider,
+              private zone: NgZone,
               @Inject(IDENTITY_PROVIDER_IT) private identity: IdentityProvider,
               private deviceAccount: DeviceAccountProvider,
               private input: InputProvider) {
@@ -50,51 +54,9 @@ export class LockscreenPage implements OnInit {
 
   ionViewDidEnter() {
     this.handle()
-    // Promise.resolve()
-    //   .then(() =>
-    //     this.deviceAccount.loginDeviceAccount()
-    //         .then(() => console.log('Logged in to device account'))
-    //         .catch(() => console.log('Could not log in to device account'))
-    //   )
-    //   .then(() =>
-    //     this.identity.isAuthenticated()
-    //         .then(is => {
-    //           if (!is) {
-    //             this.navCtrl.push(LoginPage)
-    //             throw 'Skip'
-    //           }
-    //         })
-    //   )
-    //   .then(() =>
-    //     this.deviceAccount.isConfigured()
-    //         .then(is => {
-    //           if (!is) {
-    //             this.navCtrl.push(DeviceGroupSetupPage)
-    //             throw 'Skip'
-    //           }
-    //         })
-    //   )
-    //   .then(() =>
-    //     this.deviceAccount.isUserConfigured()
-    //         .then(is => {
-    //           if (!is) {
-    //             this.navCtrl.push(UserProfileSetupPage)
-    //             throw 'Skip'
-    //           }
-    //         })
-    //   )
-    //   .then(() =>
-    //     this.waitForFaceAuth(
-    //       () => this.navCtrl.setRoot(HomePage),
-    //       () => this.message = "Hello, I don't think we've met?"
-    //     )
-    //   )
-    //   .catch(err => {if(err != 'Skip') console.log(err)})
   }
 
   async handle() {
-    this.busy = false
-    this.message = null
     try {
 
       await this.deviceAccount.loginDeviceAccount()
@@ -118,26 +80,20 @@ export class LockscreenPage implements OnInit {
       // }
 
       else {
-        console.log('herererererererere')
         this.waitForFaceAuth(
           () => this.navCtrl.setRoot(HomePage),
           () => {
-            this.busy = true
-            this.message = "Hello, I don't think we've met?"
-            console.log(this.message)
-            Observable.of('')
-              .delay(3000)
-              .mergeMap((value, index) => {
-                this.message = "Would you like to create an account?"
-                console.log(this.message)
-                return Observable.of(value)
+            this.messageAsync = Observable.from(["Hello, I don't think we've met?", "Would you like to join?"])
+            this.messageAsync
+              .delay(5000)
+              .finally(() => {
+                this.signinDialog = true
+                setTimeout(() => {
+                  this.signinDialog = false
+                  this.subject.next(null)
+                }, 10000)
               })
-              .delay(3000)
-              .subscribe(() => {
-                console.log('login??')
-                this.navCtrl.push(LoginPage)
-                // TODO unsubscribe
-              })
+              .subscribe()
           }
         )
       }
@@ -148,65 +104,105 @@ export class LockscreenPage implements OnInit {
   }
 
   waitForFaceAuth(onSuccess: () => void, onFailure?: () => void) {
-    let subject = new Subject()
-    let failureSubscription = subject
-      .windowCount(3)
-      .switchMap(window => window.takeLast(1))
-      .subscribe(() => onFailure())
 
-    let faceSubscription = this.input.getFaces()
+    this.faceSubscription = this.input.getFaces()
+      .delay(1000)
       .throttleTime(1000)
-      .switchMap(face =>
+      .concatMap(face => {
 
-        new Observable<HTMLImageElement>(observer => {
+        console.log('### New face')
+
+        return new Observable<HTMLImageElement>(observer => {
+          console.log('### New face obs')
           var i = new Image()
           i.onload = () => observer.next(i)
           i.src = 'data:image/jpeg;charset=utf-8;base64,' + face
         })
-        .map(i => ({ face, i }))
+        .filter(i => i.width >= 80 && i.height >= 80)
+        .map(() => face)
 
-      ).filter(({ i }) =>  {
-        return i.width >= 80 && i.height >= 80
       })
-      .switchMap(({ face }) => {
-        return this.busy ? Observable.empty() : Observable.fromPromise(this.deviceAccount.authenticateUserFace(face))
-          .catch(err => {
-            subject.next()
-            return Observable.empty()
+      .concatMap(face => {
+        return Observable.fromPromise(this.deviceAccount.authenticateUserFace(face))
+      })
+      .retryWhen(errObs => {
+        console.log('### Retrying face auth request')
+        return errObs.concatMap(err => {
+          console.log('### Retrying face auth request mergemap')
+          console.log('@@@retrying...')
+          this.i = this.i % 3; this.i++;
+          console.log('@@@>>>>>>'+this.i)
+
+          if (this.i < 3) return Observable.throw(err)
+
+          return Observable.create(observer => {
+            console.log('@@@prompting user...')
+            this.zone.run(() => {
+              onFailure()
+            })
+            this.subject.take(1).subscribe(() => {
+              console.log('@@@continued after waiting...')
+              // observer.next(Observable.empty())
+              observer.next(Observable.throw(err))
+            })
           })
+        })
+
       })
-      .subscribe((token) => {
-        console.log(token)
-        faceSubscription.unsubscribe()
-        failureSubscription.unsubscribe()
+      .retry()
+      .take(1)
+      .subscribe(() => {
         onSuccess()
       })
   }
 
-  ngOnInit(): void {
-    // this.auth.isAuthenticated().then(() => {
-    //   console.log(AWS.config.credentials);
-    //
-    //   var id = (<AWS.CognitoIdentityCredentials>AWS.config.credentials).identityId;
-    //   console.log('Cognito Identity ID '+ id);
-    //
-    //   // Instantiate aws sdk service objects now that the credentials have been updated
-    //   var docClient = new AWS.DynamoDB.DocumentClient({ region: AWS.config.region });
-    //   var params = {
-    //     TableName: 'MagicMirror-dev-users',
-    //     Item:{userid:id, status:'b'}
-    //   };
-    //   docClient.put(params, function(err, data) {
-    //     if (err)
-    //        console.error(err);
-    //     else
-    //        console.log(data);
-    //   });
-    //
-    // }).catch(() => {
-    //   console.log('failed....')
-    // })
-
+  sure() {
+    this.faceSubscription.unsubscribe()
+    this.messageAsync = Observable.from(["Great!"])
+    this.messageAsync
+      .delay(1500)
+      .finally(() => {
+        this.signinDialog = false
+        this.navCtrl.push(LoginPage)
+      })
+      .subscribe()
   }
+
+  nah() {
+    this.messageAsync = Observable.from(["Hmm... I don't like you very much"])
+    this.messageAsync
+      .delay(50)
+      .finally(() => {
+        this.signinDialog = false
+        setTimeout(() => {this.subject.next(null)}, 5000)
+      })
+      .subscribe()
+  }
+
+  // ngOnInit(): void {
+  //   this.auth.isAuthenticated().then(() => {
+  //     console.log(AWS.config.credentials);
+  //
+  //     var id = (<AWS.CognitoIdentityCredentials>AWS.config.credentials).identityId;
+  //     console.log('Cognito Identity ID '+ id);
+  //
+  //     // Instantiate aws sdk service objects now that the credentials have been updated
+  //     var docClient = new AWS.DynamoDB.DocumentClient({ region: AWS.config.region });
+  //     var params = {
+  //       TableName: 'MagicMirror-dev-users',
+  //       Item:{userid:id, status:'b'}
+  //     };
+  //     docClient.put(params, function(err, data) {
+  //       if (err)
+  //          console.error(err);
+  //       else
+  //          console.log(data);
+  //     });
+  //
+  //   }).catch(() => {
+  //     console.log('failed....')
+  //   })
+  //
+  // }
 
 }

@@ -1,27 +1,30 @@
 import { Injectable, Inject, InjectionToken } from '@angular/core';
 
-import { FederatedIdentitySession } from "./federated-identity";
-import { CognitoSession } from "./cognito-session";
-import { FacebookSession } from "./facebook-session";
-import { GoogleSession } from "./google-session";
+import { IFederatedIdentityFactory, IFederatedIdentitySession, IFederatedIdentityProfile } from "./federated-identity";
+import { CognitoIdentityFactory } from "./cognito/cognito-factory";
+import { FacebookIdentityFactory } from "./facebook/facebook-factory";
+import { GoogleIdentityFactory } from "./google/google-factory";
+import { DeviceIdentityFactory } from './device/device-factory';
 
 
 @Injectable()
-export class FederatedIdentitySessionMapper {
+export class IFederatedIdentitySessionMapper {
 
-  private sessionProviders: { [provider: string]: FederatedIdentitySession }
+  private sessionProviders: { [provider: string]: IFederatedIdentityFactory<IFederatedIdentitySession, IFederatedIdentityProfile> }
 
-  constructor(cognitoSession: CognitoSession,
-              facebookSession: FacebookSession,
-              googleSession: GoogleSession) {
+  constructor(cognitoFactory: CognitoIdentityFactory,
+              facebookFactory: FacebookIdentityFactory,
+              googleFactory: GoogleIdentityFactory,
+              deviceFactory: DeviceIdentityFactory) {
     this.sessionProviders = {
-      [cognitoSession.getLoginProvider()]: cognitoSession,
-      [facebookSession.getLoginProvider()]: facebookSession,
-      [googleSession.getLoginProvider()]: googleSession
+      // [cognitoFactory.getFederatedIdentitySession().getLoginProvider()]: cognitoFactory,
+      [facebookFactory.getFederatedIdentitySession().getLoginProvider()]: facebookFactory,
+      [googleFactory.getFederatedIdentitySession().getLoginProvider()]: googleFactory,
+      [deviceFactory.getFederatedIdentitySession().getLoginProvider()]: deviceFactory
     }
   }
 
-  get(provider: string): FederatedIdentitySession {
+  get(provider: string): IFederatedIdentityFactory<IFederatedIdentitySession, IFederatedIdentityProfile> {
     return this.sessionProviders[provider]
   }
 

@@ -1,5 +1,7 @@
 import { Component, Input } from '@angular/core';
 
+import { Observable } from 'rxjs/Observable';
+
 
 @Component({
   selector: 'speech',
@@ -8,10 +10,10 @@ import { Component, Input } from '@angular/core';
 export class SpeechComponent {
 
   @Input()
-  text: string;
+  text: string | Observable<string>;
 
   constructor() {
-    
+
   }
 
 }

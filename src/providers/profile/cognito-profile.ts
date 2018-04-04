@@ -16,31 +16,31 @@ export class CognitoProfileProvider implements ProfileProvider {
   }
 
   private getAttributes(): Promise<{[key: string]: string}> {
-    return this.cognitoAuth.getSession().then(() => {
+    // return this.cognitoAuth.getSession().then(() => {
       return new Promise<{[key: string]: string}>((resolve, reject) => {
-
-        if(!this._attributes) {
-          this.cognitoAuth.user.getUserAttributes((err: Error, attributes: Array<CognitoUserAttribute>) => {
-            if (err) {
-              reject(`CouldNotGetAttributes: ${err}`)  // TODO
-              return
-            }
-
-            this._attributes = {}
-
-            attributes.forEach(value => {
-              this._attributes[value.getName()] = value.getValue()
-            })
-
-            resolve(this._attributes)
-
-          })
-        } else {
+        //
+        // if(!this._attributes) {
+        //   this.cognitoAuth.user.getUserAttributes((err: Error, attributes: Array<CognitoUserAttribute>) => {
+        //     if (err) {
+        //       reject(`CouldNotGetAttributes: ${err}`)  // TODO
+        //       return
+        //     }
+        //
+        //     this._attributes = {}
+        //
+        //     attributes.forEach(value => {
+        //       this._attributes[value.getName()] = value.getValue()
+        //     })
+        //
+        //     resolve(this._attributes)
+        //
+        //   })
+        // } else {
           resolve(this._attributes)
-        }
+        // }
 
       })
-    })
+    // })
   }
 
   private getAttribute(name: string): Promise<string> {
@@ -60,8 +60,16 @@ export class CognitoProfileProvider implements ProfileProvider {
     return this.getAttribute('name')
   }
 
-	public getId(): Promise<string> {
-    return this.getAttribute('sub')
+	getPicture(): Promise<string> {
+		throw new Error("Method not implemented.");
+	}
+
+	getLastName(): Promise<string> {
+		throw new Error("Method not implemented.");
+	}
+
+	getFirstName(): Promise<string> {
+		throw new Error("Method not implemented.");
 	}
 
 }

@@ -1,3 +1,12 @@
 page-lockscreen {
+  .floating-options {
+    float: right;
+    display: inline-grid;
+    padding-top: 100px;
 
+    .button {
+      padding: 2.5rem 5rem;
+      margin: 10px 0;
+    }
+  }
 }

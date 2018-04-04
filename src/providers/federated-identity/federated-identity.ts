@@ -1,18 +1,35 @@
 import { Injectable, Inject, InjectionToken } from '@angular/core';
 
 import * as AWS from "aws-sdk";
+import { Subject, Subscription } from 'rxjs';
 
 import { ENV_PROVIDER_IT } from "../../environment/environment";
 import { AuthErrors } from "../auth/auth";  // TODO remove
+import { IdentityOnUpdate } from './federated-identity-session-storage';
+import { CognitoIdentityCredentials } from 'aws-sdk';
+import { GetIdInput, GetOpenIdTokenInput } from 'aws-sdk/clients/cognitoidentity';
 
 
-export interface FederatedIdentitySession {
+export interface IFederatedIdentitySession {
   getLoginProvider(): string
   getIdentityId(): string
   getLoginToken(): Promise<string>
-  // expiry??
   getSession(): {}
   setSession(data: {})
+  onUpdate(): Subject<{}>
+}
+
+
+export interface IFederatedIdentityProfile {
+  getFirstName(): Promise<string>
+  getLastName(): Promise<string>
+  getPicture(): Promise<string>
+}
+
+
+export interface IFederatedIdentityFactory<T extends IFederatedIdentitySession, U extends IFederatedIdentityProfile> {
+  getFederatedIdentitySession(): T
+  getFederatedIdentityProfile(): U
 }
 
 
@@ -22,34 +39,62 @@ export interface IdentityProvider {
 }
 
 
-export class FederatedIdentityConfigProvider {
+export interface FederatedIdentityConfigProvider {
   IDENTITY_POOL_ID: string
   REGION: string
 }
 
 
 @Injectable()
-export class FederatedIdentityProvider implements IdentityProvider {
+export class FederatedIdentityProvider implements IdentityProvider, IdentityOnUpdate, IFederatedIdentityFactory<IFederatedIdentitySession, IFederatedIdentityProfile> {
 
-  private session: FederatedIdentitySession
+  private factory: IFederatedIdentityFactory<IFederatedIdentitySession, IFederatedIdentityProfile>
+  private sessionUpdatededSubscription: Subscription
+  private identityRefreshedSubject: Subject<{identityId: string, sessionLoginProvider: string, sessionData: {}}>
 
   constructor(@Inject(ENV_PROVIDER_IT) private config: FederatedIdentityConfigProvider) {
-
+    this.identityRefreshedSubject = new Subject()
   }
 
-  getFederatedIdentitySession(): FederatedIdentitySession {
-    return this.session
+  public setFederatedIdentityFactory(factory: IFederatedIdentityFactory<IFederatedIdentitySession, IFederatedIdentityProfile>): void {
+    AWS.config.credentials && (<CognitoIdentityCredentials>AWS.config.credentials).clearCachedId()
+    if(this.sessionUpdatededSubscription) this.sessionUpdatededSubscription.unsubscribe()
+    this.factory = factory
+    this.sessionUpdatededSubscription = this.getFederatedIdentitySession().onUpdate().subscribe(() => {
+      console.log('updating session...')
+      this.getSession()
+        .then(() => {
+          // push the new credentials
+          let identityId = this.getIdentityId()
+          let sessionLoginProvider = this.getFederatedIdentitySession().getLoginProvider()
+          let sessionData = this.getFederatedIdentitySession().getSession()
+          this.identityRefreshedSubject.next({identityId, sessionLoginProvider, sessionData})
+        })
+        .catch()
+    })
   }
 
-  setFederatedIdentitySession(session: FederatedIdentitySession): void {
-    this.session = session
+  public onUpdate(): Subject<{identityId: string, sessionLoginProvider: string, sessionData: {}}> {
+		return this.identityRefreshedSubject
+	}
+
+	public getFederatedIdentityProfile(): IFederatedIdentityProfile {
+		return this.factory.getFederatedIdentityProfile()
+	}
+
+  public getFederatedIdentitySession(): IFederatedIdentitySession {
+    return this.factory.getFederatedIdentitySession()
   }
 
-  getIdentityId(): Promise<string> {
-    return AWS.config.credentials.data.IdentityId
+  public getIdentityId(): string {
+    return (<CognitoIdentityCredentials>AWS.config.credentials).identityId
   }
 
-  getSession(): Promise<void> {
+  private get session(): IFederatedIdentitySession {
+    return this.getFederatedIdentitySession()
+  }
+
+  public getSession(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       if (!this.session) {
         reject(AuthErrors.NoSessionFound)
@@ -66,22 +111,26 @@ export class FederatedIdentityProvider implements IdentityProvider {
         console.log(endpoint)
         console.log(logins)
 
-        AWS.config.region = this.config.REGION
+        AWS.config.region = this.config.REGION;
 
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId : this.config.IDENTITY_POOL_ID,
-            ...identityId && {IdentityId: identityId},
-            Logins : logins,
-            // LoginId: 'w@w.com'  // TODO investigate purpose? - possibly required for multiple sessions/users, not email?
-        });
+        if (!(
+          AWS.config.credentials &&
+          (<GetIdInput | GetOpenIdTokenInput>(<CognitoIdentityCredentials>AWS.config.credentials).params).Logins[endpoint] == token
+        ))
+          AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+              IdentityPoolId : this.config.IDENTITY_POOL_ID,
+              ...identityId && {IdentityId: identityId},
+              Logins : logins
+          });
 
-        (<AWS.CognitoIdentityCredentials>AWS.config.credentials).getPromise().then(() => {
-          console.log('AWS Credentials:::')
+        (<CognitoIdentityCredentials>AWS.config.credentials).getPromise().then(() => {
+          console.log('AWS credentials:')
           console.log(AWS.config.credentials)
           resolve()
         }).catch((err) => {
+          console.log('Failed to obtain AWS credentials:')
           console.log(err)
-          reject('Failed to obtain AWS credentials')
+          reject(err)
         })
       })
       .catch(err => reject(err))
@@ -89,7 +138,7 @@ export class FederatedIdentityProvider implements IdentityProvider {
   }
 
   public isAuthenticated(): Promise<boolean> {
-    return new Promise<boolean>((resolve, reject) => {
+    return new Promise<boolean>(resolve => {
       this.getSession()
         .then((_) => resolve(true))
         .catch(err => {

@@ -7,14 +7,15 @@ import { AUTH_PROVIDER_IT, AuthProvider, AuthErrors } from '../../providers/auth
 import { PasswordValidators } from '../../util/forms/validators'
 import { SocialDeviceLoginPage } from "../social-device-login/social-device-login";
 import { FederatedIdentityProvider } from "../../providers/federated-identity/federated-identity";
-import { CognitoSession } from "../../providers/federated-identity/cognito-session";
-import { FacebookSession } from "../../providers/federated-identity/facebook-session";
+
 import * as AWS from "aws-sdk";
 import { LockscreenPage } from "../lockscreen/lockscreen";
 import { DeviceGroupSetupPage } from "../device-group-setup/device-group-setup";
 import { UserProfileSetupPage } from "../user-profile-setup/user-profile-setup";
 import { DeviceAccountProvider } from "../../providers/device-account/device-account";
-import { GoogleSession } from "../../providers/federated-identity/google-session";
+import { GoogleIdentityFactory } from "../../providers/federated-identity/google/google-factory";
+import { FacebookIdentityFactory } from "../../providers/federated-identity/facebook/facebook-factory";
+import { CognitoIdentityFactory } from "../../providers/federated-identity/cognito/cognito-factory";
 
 
 @Component({
@@ -32,9 +33,9 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
               @Inject(AUTH_PROVIDER_IT) private auth: AuthProvider,
               private deviceAccount: DeviceAccountProvider,
               private federatedIdentity: FederatedIdentityProvider,
-              private cognitoSession: CognitoSession,
-              private facebookSession: FacebookSession,
-              private googleSession: GoogleSession) {
+              private googleFactory: GoogleIdentityFactory,
+              private facebookFactory: FacebookIdentityFactory,
+              private cognitoFactory: CognitoIdentityFactory) {
   }
 
   ngOnInit(): void {
@@ -73,7 +74,7 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
       password: this.password.value
     })
     .then(() => {
-      this.federatedIdentity.setFederatedIdentitySession(this.cognitoSession)
+      this.federatedIdentity.setFederatedIdentityFactory(this.cognitoFactory)
       this.federatedIdentity.isAuthenticated()
         .then(() => {
           // this.navCtrl.setRoot(LockscreenPage)
@@ -129,10 +130,10 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
 
   private google() {
     let modal = this.modalCtrl.create(SocialDeviceLoginPage, {socialLoginProvider: 'Google'})
-    modal.onDidDismiss(({ accessToken, expiresIn, refreshToken, idToken } = {}) => {
+    modal.onDidDismiss(({ accessToken, expires, refreshToken, idToken } = {}) => {
       if (accessToken) {
-        this.googleSession.setSession({accessToken, expiresIn, refreshToken, idToken})
-        this.federatedIdentity.setFederatedIdentitySession(this.googleSession)
+        this.federatedIdentity.setFederatedIdentityFactory(this.googleFactory)
+        this.googleFactory.getFederatedIdentitySession().setSession({accessToken, expires, refreshToken, idToken})
         this.federatedIdentity.isAuthenticated()
           .then(() => {
             // this.navCtrl.setRoot(LockscreenPage)
@@ -145,10 +146,10 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
 
   private facebook() {
     let modal = this.modalCtrl.create(SocialDeviceLoginPage, {socialLoginProvider: 'Facebook'})
-    modal.onDidDismiss(({ accessToken, expiresIn } = {}) => {
+    modal.onDidDismiss(({ accessToken, expires } = {}) => {
       if (accessToken) {
-        this.facebookSession.setSession({accessToken, expiresIn})
-        this.federatedIdentity.setFederatedIdentitySession(this.facebookSession)
+        this.federatedIdentity.setFederatedIdentityFactory(this.facebookFactory)
+        this.facebookFactory.getFederatedIdentitySession().setSession({accessToken, expires})
         this.federatedIdentity.isAuthenticated()
           .then(() => {
             // this.navCtrl.setRoot(LockscreenPage)
@@ -160,6 +161,7 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
   }
 
   private async continue() {
+    await this.deviceAccount.joinDeviceGroup()
     if (!await this.deviceAccount.isConfigured()) {
       let modal = this.modalCtrl.create(DeviceGroupSetupPage)
       modal.onDidDismiss(async () => {
@@ -178,16 +180,18 @@ export class LoginPage implements OnInit {  // TODO: remove validation for log i
         }
       })
       modal.present()
-    } else if (!await this.deviceAccount.isUserConfigured()) {
-      let modal = this.modalCtrl.create(UserProfileSetupPage)
-      modal.onDidDismiss(async () => {
-        if (await this.deviceAccount.isUserConfigured()) {
-          this.navCtrl.pop()
-        }
-      })
-      modal.present()
     } else {
-      this.navCtrl.pop()
+      if (!await this.deviceAccount.isUserConfigured()) {
+        let modal = this.modalCtrl.create(UserProfileSetupPage)
+        modal.onDidDismiss(async () => {
+          if (await this.deviceAccount.isUserConfigured()) {
+            this.navCtrl.pop()
+          }
+        })
+        modal.present()
+      } else {
+        this.navCtrl.pop()
+      }
     }
   }
 

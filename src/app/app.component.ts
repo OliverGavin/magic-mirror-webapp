@@ -11,6 +11,7 @@ import { LockscreenPage } from '../pages/lockscreen/lockscreen';
 })
 export class MyApp {
   // rootPage:any = LoginPage;
+  // rootPage:any = LockscreenPage;
   rootPage:any = LockscreenPage;
   // rootPage:any = HomePage;
 

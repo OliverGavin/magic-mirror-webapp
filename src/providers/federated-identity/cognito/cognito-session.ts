@@ -1,9 +1,10 @@
 import { Injectable, Inject } from '@angular/core';
 
-import { FederatedIdentitySession } from "./federated-identity";
-import { ENV_PROVIDER_IT } from "../../environment/environment";
 import { CognitoUser, CognitoUserPool, CognitoUserSession } from "amazon-cognito-identity-js";
-import { AuthErrors } from "../auth/auth";
+
+import { IFederatedIdentitySession } from "../federated-identity";
+import { ENV_PROVIDER_IT } from "../../../environment/environment";
+import { AuthErrors } from "../../auth/auth";
 
 
 export class CognitoSessionConfigProvider {
@@ -19,7 +20,7 @@ export interface ICognitoSessionData {
 
 
 @Injectable()
-export class CognitoSession implements FederatedIdentitySession {
+export class CognitoSession implements IFederatedIdentitySession {
 
   private _user: CognitoUser
 

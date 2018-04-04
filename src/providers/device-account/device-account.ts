@@ -8,8 +8,10 @@ import "rxjs/add/operator/map"
 import { AUTH_PROVIDER_IT, AuthProvider } from "../auth/auth";
 import { PROFILE_PROVIDER_IT, ProfileProvider } from "../profile/profile";
 import { ENV_PROVIDER_IT } from "../../environment/environment";
-import { FederatedIdentityProvider, FederatedIdentitySession } from "../federated-identity/federated-identity";
-import { FederatedIdentitySessionMapper } from "../federated-identity/federated-identity-session-mapper";
+import { FederatedIdentityProvider, IFederatedIdentitySession } from "../federated-identity/federated-identity";
+import { IFederatedIdentitySessionMapper } from "../federated-identity/federated-identity-session-mapper";
+import { FederatedIdentitySessionStorage } from '../federated-identity/federated-identity-session-storage';
+import { DeviceIdentityFactory } from '../federated-identity/device/device-factory';
 
 
 export class IApiConfigData {
@@ -37,7 +39,9 @@ export class DeviceAccountProvider {
               @Inject(AUTH_PROVIDER_IT) public auth: AuthProvider,
               // @Inject(PROFILE_PROVIDER_IT) public profile: ProfileProvider,
               private federatedIdentity: FederatedIdentityProvider,
-              private sessionProviders: FederatedIdentitySessionMapper,
+              private identityFactories: IFederatedIdentitySessionMapper,
+              private deviceFactory: DeviceIdentityFactory,
+              private federatedIdentityStorage: FederatedIdentitySessionStorage,
               @Inject(ENV_PROVIDER_IT) private apiConfig: IApiConfigData) {
 
   }
@@ -95,7 +99,7 @@ export class DeviceAccountProvider {
             .toPromise()
         })
         .then(() => resolve(true))
-        .catch(err => err == null || (status in err && err.status == 404) ? resolve(false) : reject(err))
+        .catch(err => err == null || (err.status == 404 || err.status == 403) ? resolve(false) : reject(err))
     })
   }
 
@@ -107,7 +111,7 @@ export class DeviceAccountProvider {
             .get(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/users/${userId}`)
             .toPromise()
         })
-        .then(data => resolve(data['faceNum'] >= 6))
+        .then(data => resolve(data['faceNum'] >= 3))
         .catch(err => reject(err))
     })
   }
@@ -117,16 +121,16 @@ export class DeviceAccountProvider {
     return new Promise<void>((resolve, reject) => {
       // Promise.all([this.getDeviceGroupOwnerToken(), this.getDeviceGroupOwnerIdentityId()])
       //   .then(([token, identityId]) => {
-      //     this.deviceSession.setSession({accessToken: token, expiresIn: 0})
+      //     this.deviceSession.setSession({accessToken: token, expires: 0})
       //     this.deviceSession.setIdentityId(identityId)
-      //     this.federatedIdentity.setFederatedIdentitySession(this.deviceSession)
+      //     this.federatedIdentity.setIFederatedIdentitySession(this.deviceSession)
       //     return this.federatedIdentity.getSession()
       //   })
       Promise.all<string, {}>([this.getDeviceAccountLoginProvider(), this.getDeviceAccountSessionData()])
         .then(([provider, session]) => {
-          let sessionProvider = this.sessionProviders.get(provider)
-          sessionProvider.setSession(session)
-          this.federatedIdentity.setFederatedIdentitySession(sessionProvider)
+          let identityFactory = this.identityFactories.get(provider)
+          identityFactory.getFederatedIdentitySession().setSession(session)
+          this.federatedIdentity.setFederatedIdentityFactory(identityFactory)
           return this.federatedIdentity.getSession()
         })
         .then(() => resolve())
@@ -185,7 +189,7 @@ export class DeviceAccountProvider {
       //   .then(() => resolve())
       //   .catch(err => reject(err))
 
-      let session: FederatedIdentitySession = this.federatedIdentity.getFederatedIdentitySession()
+      let session: IFederatedIdentitySession = this.federatedIdentity.getFederatedIdentitySession()
       let provider = session.getLoginProvider()
       let sessionData = session.getSession()
 
@@ -204,15 +208,19 @@ export class DeviceAccountProvider {
       .then(() => this.setDeviceGroupId(group.id))
   }
 
-  public joinDeviceGroup(): Promise<IDeviceGroupUserData> {
-    // read current group from storage
-    let group = {
-      groupid: ''
-    }
-    return this.http
-      .post(this.apiConfig.API_ENDPOINT + '/devicegroupusers', group)
-      .map(response => (<IDeviceGroupUserData> response))
-      .toPromise()
+  public joinDeviceGroup(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      Promise.all([this.federatedIdentity.getIdentityId(), this.getDeviceGroupId()])
+        .then(([userId, groupId]) =>
+          this.http
+            .post(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/users`, {
+              userId: userId
+            })
+            .toPromise()
+        )
+        .then(() => resolve())
+        .catch(err => err == null || err.status == 409 || err.status == 404 ? resolve() : reject(err))
+    })
   }
 
   public leaveDeviceGroup() {
@@ -229,7 +237,7 @@ export class DeviceAccountProvider {
             .post(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/users/${userId}/faces`, {
               faces: faces,
               provider: provider,
-              token: token
+              token: token  // TODO check if just identity token server side can be used??
             })
             .toPromise()
         )
@@ -238,20 +246,36 @@ export class DeviceAccountProvider {
     })
   }
 
-  public authenticateUserFace(face: string): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      this.getDeviceGroupId()
-        .then(groupId =>
-          this.http
+  public authenticateUserFace(face: string): Promise<void> {
+    // get stored tokens and load
+    return this.getDeviceGroupId()
+        .then(groupId => {
+          console.log('### 1 Making face auth request')
+          return this.http
             .post(this.apiConfig.API_ENDPOINT + `/api/groups/${groupId}/auth`, {
               face: face
             })
-            .map(response => (<string> response['token']))
-            .toPromise()
-        )
-        .then(token => resolve(token))
-        .catch(err => reject(err))
-    })
+            .do(() => {
+              console.log('### 2 Completed face auth request')
+            })
+            .map(response => ({token: <string> response['token'], identityId: <string> response['identityId']}))
+            .toPromise().catch(err => {console.log('### 2 err'); throw err})
+        })
+        // load the credentials
+        .then(({token, identityId}) => {
+          console.log('### 3 Loading cognito credentials')
+          this.federatedIdentity.setFederatedIdentityFactory(this.deviceFactory)
+          this.deviceFactory.getFederatedIdentitySession().setIdentityId(identityId)
+          this.deviceFactory.getFederatedIdentitySession().setSession({
+            accessToken: token,
+            expires: new Date().getTime() + 15*60*1000  // TODO
+          })
+          return this.federatedIdentity.getSession().catch(err => {console.log('### 3.5 err'); throw err})
+        })
+        .then(() => {
+          console.log('### 4 Restoring credentials')
+          return this.federatedIdentityStorage.restore().catch(err => {console.log('### 4.5 err'); throw err})
+        })
   }
 
 }

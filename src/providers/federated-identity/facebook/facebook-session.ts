@@ -1,21 +1,23 @@
 import { Injectable, Inject } from '@angular/core';
 
-import { FederatedIdentitySession } from "./federated-identity";
+import { IFederatedIdentitySession } from "../federated-identity";
+import { Subject } from 'rxjs';
 
 
 export interface IFacebookSessionData {
   accessToken: string
-  expiresIn: number
+  expires: number
 }
 
 
 @Injectable()
-export class FacebookSession implements FederatedIdentitySession {
+export class FacebookSession implements IFederatedIdentitySession {
 
   private session: IFacebookSessionData
+  private changeSubject: Subject<IFacebookSessionData>
 
   constructor() {
-    // TODO expiry?
+    this.changeSubject = new Subject<IFacebookSessionData>()
   }
 
   public getSession(): IFacebookSessionData {
@@ -24,6 +26,7 @@ export class FacebookSession implements FederatedIdentitySession {
 
   public setSession(data: IFacebookSessionData) {
     this.session = data
+    this.changeSubject.next(this.session)
   }
 
 	public getLoginProvider(): string {
@@ -35,11 +38,16 @@ export class FacebookSession implements FederatedIdentitySession {
 	}
 
 	public getLoginToken(): Promise<string> {
-    // TODO refresh, verify etc
-    // AWS.config.credentials.params.Logins['graph.facebook.com'] = updatedToken;
     return new Promise<string>((resolve, reject) => {
+      if (this.session.expires < new Date().getTime())
+        reject(new Error('Session expired or is invalid'))
+
       resolve(this.session.accessToken)
     })
 	}
+
+  onUpdate(): Subject<{}> {
+    return this.changeSubject
+  }
 
 }

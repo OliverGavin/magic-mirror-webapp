@@ -34,6 +34,8 @@ export class FacebookDeviceAuthProvider implements SocialDeviceAuthProvider {
 
 	begin(callbacks: SocialDeviceAuthCallbacks): Subscription {
 
+    let now = new Date()
+
 		return this.http
       // Request a verification code
       .post(FacebookDeviceAuthProvider.INIT_ENDPOINT, {
@@ -81,7 +83,10 @@ export class FacebookDeviceAuthProvider implements SocialDeviceAuthProvider {
         }
       )
       .subscribe(
-        data => callbacks.onSuccess({accessToken: data['access_token'], expiresIn: data['expires_in']}),
+        data => callbacks.onSuccess({
+          accessToken: data['access_token'],
+          expires: now.getTime() + data['expires_in'] * 1000
+        }),
         err => (err instanceof TimeoutError) ? callbacks.onTimeout() : callbacks.onError(err)
       )
 

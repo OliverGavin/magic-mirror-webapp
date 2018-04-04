@@ -1,4 +1,13 @@
 <ion-content padding>
   <clock></clock>
-  <speech [text]="message"></speech>
+  <speech [text]="messageAsync"></speech>
+
+  <div *ngIf="signinDialog" class="floating-options">
+    <button ion-button outline color="light" (click)="sure()" type="button">
+      Sure
+    </button>
+    <button ion-button outline color="light" (click)="nah()" type="button">
+      No way
+    </button>
+  </div>
 </ion-content>
